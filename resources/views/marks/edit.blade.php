@@ -1,0 +1,23 @@
+<x-app-layout>
+    <x-slot name="header">
+        <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ __('Edit Mark') }}</h2>
+    </x-slot>
+
+    <div class="py-12">
+        <div class="max-w-5xl mx-auto sm:px-6 lg:px-8">
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                <div class="p-6 text-gray-900">
+                    @include('marks._form', [
+                        'mark' => $mark,
+                        'exams' => $exams,
+                        'students' => $students,
+                        'subjects' => $subjects,
+                        'action' => route('marks.update', $mark),
+                        'method' => 'PATCH',
+                        'submitLabel' => 'Update Mark',
+                    ])
+                </div>
+            </div>
+        </div>
+    </div>
+</x-app-layout>
