@@ -387,6 +387,14 @@ class StudentIdCardController extends Controller
                 'footer_bottom' => '#16a34a',
                 'brand' => '#166534',
             ],
+            'orange' => [
+                'accent' => '#ea580c',
+                'accent_dark' => '#c2410c',
+                'accent_light' => '#fb923c',
+                'footer_top' => '#f97316',
+                'footer_bottom' => '#ea580c',
+                'brand' => '#9a3412',
+            ],
             'purple' => [
                 'accent' => '#7c3aed',
                 'accent_dark' => '#6d28d9',

@@ -44,7 +44,7 @@ class UpdateStudentRequest extends FormRequest
             'emergency_contact_number' => ['nullable', 'string', 'max:255'],
             'address' => ['nullable', 'string'],
             'photo' => ['nullable', 'image', 'max:5120'],
-            'card_color' => ['required', 'in:yellow,red,blue,green'],
+            'card_color' => ['required', 'in:yellow,red,blue,green,orange'],
             'status' => ['required', 'in:active,inactive,graduated,transferred,archived'],
             'father_name' => ['nullable', 'string', 'max:255'],
             'father_occupation' => ['nullable', 'string', 'max:255'],

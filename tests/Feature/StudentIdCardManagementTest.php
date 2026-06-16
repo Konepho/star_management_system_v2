@@ -264,14 +264,14 @@ class StudentIdCardManagementTest extends TestCase
         $user = User::factory()->create();
         $student = Student::factory()->create([
             'name_en' => 'Aye Chan',
-            'card_color' => 'red',
+            'card_color' => 'orange',
         ]);
 
         $response = $this->actingAs($user)->get(route('student-id-cards.print', $student));
 
         $response->assertOk();
-        $response->assertSee('--accent: #d62828;', false);
-        $response->assertSee('--footer-bottom: #d62828;', false);
+        $response->assertSee('--accent: #ea580c;', false);
+        $response->assertSee('--footer-bottom: #ea580c;', false);
     }
 
     private function fakeImageUpload(string $name): UploadedFile

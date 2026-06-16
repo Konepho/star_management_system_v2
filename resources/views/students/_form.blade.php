@@ -122,6 +122,7 @@
                     <option value="red" @selected($selectedCardColor === 'red')>Red</option>
                     <option value="blue" @selected($selectedCardColor === 'blue')>Blue</option>
                     <option value="green" @selected($selectedCardColor === 'green')>Green</option>
+                    <option value="orange" @selected($selectedCardColor === 'orange')>Orange</option>
                 </select>
                 <p class="mt-1 text-xs text-slate-500">This controls the printed student ID card color.</p>
                 <x-input-error class="mt-2" :messages="$errors->get('card_color')" />
