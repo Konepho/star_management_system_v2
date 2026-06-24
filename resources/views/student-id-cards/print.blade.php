@@ -6,13 +6,13 @@
     <title>ID Cards</title>
     <style>
         @page {
-            size: 54mm 85mm;
+            size: 55mm 87mm;
             margin: 0;
         }
 
         :root {
-            --card-width: 5.4cm;
-            --card-height: 8.5cm;
+            --card-width: 5.5cm;
+            --card-height: 8.7cm;
             --paper: #ffffff;
             --page: #f3f7fb;
             --ink: #17212d;
@@ -65,7 +65,7 @@
         .page {
             max-width: 1180px;
             margin: 16px auto 40px;
-            padding: 0 16px;
+            /* padding: 0 16px; */
         }
 
         .cards {
@@ -79,8 +79,8 @@
             width: var(--card-width);
             min-height: var(--card-height);
             background: linear-gradient(180deg, #ffffff 0%, #fffefb 83.5%, var(--footer-top) 83.5%, var(--footer-bottom) 100%);
-            border: 1px solid #dce5ed;
-            border-radius: 20px;
+            /* border: 1px solid #dce5ed; */
+            /* border-radius: 20px; */
             overflow: hidden;
             box-shadow: 0 16px 36px rgba(16, 32, 51, 0.08);
             page-break-inside: avoid;
@@ -102,9 +102,10 @@
             position: relative;
             z-index: 1;
             min-height: var(--card-height);
-            padding: 0.14cm 0.24cm 0;
+            padding: 0.25cm; /*0.14cm 0.24cm 0*/
             display: flex;
             flex-direction: column;
+            
         }
 
         .brand {
@@ -273,8 +274,8 @@
             .cards { gap: 0.35cm; }
             .card {
                 box-shadow: none;
-                border-radius: 14px;
-                border-color: #cfd9e3;
+                /* border-radius: 14px; */
+                /* border-color: #cfd9e3; */
                 min-height: var(--card-height);
                 height: var(--card-height);
             }

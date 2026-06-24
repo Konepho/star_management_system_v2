@@ -235,8 +235,8 @@ class StudentIdCardManagementTest extends TestCase
         $response = $this->actingAs($user)->get(route('student-id-cards.print', $student));
 
         $response->assertOk();
-        $response->assertSee('--card-width: 5.4cm;', false);
-        $response->assertSee('--card-height: 8.5cm;', false);
+        $response->assertSee('--card-width: 5.5cm;', false);
+        $response->assertSee('--card-height: 8.7cm;', false);
         $response->assertDontSee('horizontal', false);
     }
 
