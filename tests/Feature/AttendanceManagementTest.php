@@ -38,7 +38,12 @@ class AttendanceManagementTest extends TestCase
     public function test_create_page_can_load_class_register(): void
     {
         $user = User::factory()->create();
-        [$academicYear, $section, $student] = $this->createClassEnrollment();
+        [$academicYear, $section, $student] = $this->createClassEnrollment([
+            'first_name' => 'Ko',
+            'last_name' => 'Aung',
+            'name_en' => 'Ko Aung',
+            'preferred_name' => 'Alex',
+        ]);
 
         $response = $this->actingAs($user)->get(route('attendances.create', [
             'academic_year_id' => $academicYear->id,
@@ -49,6 +54,7 @@ class AttendanceManagementTest extends TestCase
         $response->assertOk();
         $response->assertSee('Load Class Register');
         $response->assertSee($student->full_name);
+        $response->assertSee('Alex');
         $response->assertSee($student->admission_no);
     }
 
@@ -153,6 +159,30 @@ class AttendanceManagementTest extends TestCase
         $this->assertNotNull($attendance);
         $this->assertSame('absent', $attendance->status);
         $this->assertSame('Family trip', $attendance->remarks);
+    }
+
+    public function test_new_attendance_date_defaults_students_back_to_present(): void
+    {
+        $user = User::factory()->create();
+        [$academicYear, $section, $student] = $this->createClassEnrollment();
+
+        Attendance::factory()->create([
+            'student_id' => $student->id,
+            'attendance_date' => '2026-05-03',
+            'status' => 'absent',
+            'remarks' => 'Sick leave',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('attendances.create', [
+            'academic_year_id' => $academicYear->id,
+            'section_id' => $section->id,
+            'attendance_date' => '2026-05-04',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('option value="present" selected', false);
+        $response->assertDontSee('option value="absent" selected', false);
+        $response->assertDontSee('Sick leave', false);
     }
 
     public function test_store_rejects_students_outside_the_selected_class(): void
