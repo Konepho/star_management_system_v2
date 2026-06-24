@@ -82,7 +82,7 @@
                         </div>
                     </div>
                     <div class="p-6 text-gray-900">
-                        <form method="POST" action="{{ route('attendances.store') }}">
+                        <form method="POST" action="{{ route('attendances.store') }}" autocomplete="off">
                             @csrf
                             <input type="hidden" name="academic_year_id" value="{{ $selectedAcademicYearId }}">
                             <input type="hidden" name="section_id" value="{{ $selectedSectionId }}">
@@ -101,18 +101,24 @@
                                     <tbody class="divide-y divide-slate-100 bg-white">
                                         @foreach ($registerEnrollments as $index => $enrollment)
                                             @php($existingAttendance = $existingAttendances->get($enrollment->student_id))
+                                            @php($secondaryName = $enrollment->student?->preferred_name ?: $enrollment->student?->name_en)
+                                            @php($shouldUseOldInput = old('attendance_date') === $selectedDate
+                                                && (string) old('academic_year_id') === (string) $selectedAcademicYearId
+                                                && (string) old('section_id') === (string) $selectedSectionId)
                                             <tr>
                                                 <td class="px-4 py-4 align-top">
                                                     <div class="font-medium text-slate-900">{{ $enrollment->student?->full_name }}</div>
-                                                    @if ($enrollment->student?->name_mm)
-                                                        <div class="text-sm text-slate-500">{{ $enrollment->student->name_mm }}</div>
+                                                    @if ($secondaryName && $secondaryName !== $enrollment->student?->full_name)
+                                                        <div class="text-sm text-slate-500">{{ $secondaryName }}</div>
                                                     @endif
                                                 </td>
                                                 <td class="px-4 py-4 align-top text-sm text-slate-600">{{ $enrollment->student?->admission_no ?: '—' }}</td>
                                                 <td class="px-4 py-4 align-top">
                                                     <input type="hidden" name="attendances[{{ $index }}][student_id]" value="{{ $enrollment->student_id }}">
                                                     <select name="attendances[{{ $index }}][status]" class="block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
-                                                        @php($selectedStatus = old("attendances.$index.status", $existingAttendance?->status ?: 'present'))
+                                                        @php($selectedStatus = $shouldUseOldInput
+                                                            ? old("attendances.$index.status", $existingAttendance?->status ?: 'present')
+                                                            : ($existingAttendance?->status ?: 'present'))
                                                         <option value="present" @selected($selectedStatus === 'present')>Present</option>
                                                         <option value="absent" @selected($selectedStatus === 'absent')>Absent</option>
                                                         <option value="late" @selected($selectedStatus === 'late')>Late</option>
@@ -125,9 +131,10 @@
                                                     <input
                                                         type="text"
                                                         name="attendances[{{ $index }}][remarks]"
-                                                        value="{{ old("attendances.$index.remarks", $existingAttendance?->remarks) }}"
+                                                        value="{{ $shouldUseOldInput ? old("attendances.$index.remarks", $existingAttendance?->remarks) : $existingAttendance?->remarks }}"
                                                         class="block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500"
                                                         placeholder="Optional remark"
+                                                        autocomplete="off"
                                                     >
                                                     @error("attendances.$index.remarks")
                                                         <p class="mt-1 text-sm text-rose-600">{{ $message }}</p>

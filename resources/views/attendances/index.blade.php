@@ -108,11 +108,12 @@
                                     </thead>
                                     <tbody class="divide-y divide-slate-100 bg-white">
                                         @foreach ($attendanceRecords as $attendance)
+                                            @php($secondaryName = $attendance->student?->preferred_name ?: $attendance->student?->name_en)
                                             <tr>
                                                 <td class="px-4 py-4">
                                                     <div class="font-medium text-slate-900">{{ $attendance->student?->full_name }}</div>
-                                                    @if ($attendance->student?->name_mm)
-                                                        <div class="text-sm text-slate-500">{{ $attendance->student->name_mm }}</div>
+                                                    @if ($secondaryName && $secondaryName !== $attendance->student?->full_name)
+                                                        <div class="text-sm text-slate-500">{{ $secondaryName }}</div>
                                                     @endif
                                                 </td>
                                                 <td class="px-4 py-4 text-sm text-slate-600">{{ $attendance->student?->admission_no ?: '—' }}</td>
