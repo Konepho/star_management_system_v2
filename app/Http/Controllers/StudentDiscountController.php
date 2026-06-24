@@ -20,7 +20,7 @@ class StudentDiscountController extends Controller
                 ->with(['student.activeEnrollments.grade', 'student.activeEnrollments.section', 'discountDefinition'])
                 ->orderByDesc('start_date')
                 ->orderByDesc('id')
-                ->get(),
+                ->paginate(20),
         ]);
     }
 

@@ -32,6 +32,7 @@
                             <table class="min-w-full divide-y divide-slate-200">
                                 <thead class="bg-slate-50">
                                     <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">No.</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Student</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Discount</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Period</th>
@@ -43,6 +44,7 @@
                                 <tbody class="divide-y divide-slate-100 bg-white">
                                     @foreach ($studentDiscounts as $studentDiscount)
                                         <tr>
+                                            <td class="px-4 py-4 text-sm font-medium text-slate-500">{{ $studentDiscounts->firstItem() + $loop->index }}</td>
                                             <td class="px-4 py-4 text-sm text-slate-900">
                                                 <div class="font-medium">{{ $studentDiscount->student?->full_name }}</div>
                                                 <div class="text-xs text-slate-500">{{ $studentDiscount->student?->admission_no }}{{ $studentDiscount->student?->grade ? ' - '.$studentDiscount->student->grade->name : '' }}</div>
@@ -84,6 +86,9 @@
                                     @endforeach
                                 </tbody>
                             </table>
+                        </div>
+                        <div class="mt-4">
+                            {{ $studentDiscounts->links() }}
                         </div>
                     @endif
                 </div>
