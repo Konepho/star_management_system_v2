@@ -1,11 +1,16 @@
 @php
     $studentOptions = $students->map(function ($student) {
         $activeEnrollment = $student->enrollments->firstWhere('status', \App\Models\Enrollment::STATUS_ACTIVE);
+        $displayName = trim(collect([
+            trim((string) $student->preferred_name),
+            trim((string) ($student->name_en ?: $student->full_name)),
+            trim((string) $student->name_mm),
+        ])->filter()->unique()->implode(' / '));
 
         return [
             'id' => (string) $student->id,
             'label' => trim(
-                $student->full_name
+                $displayName
                 . ' - ' . $student->admission_no
                 . ($activeEnrollment?->academicYear ? ' - ' . $activeEnrollment->academicYear->name : '')
                 . ($activeEnrollment?->grade ? ' - ' . $activeEnrollment->grade->name : '')

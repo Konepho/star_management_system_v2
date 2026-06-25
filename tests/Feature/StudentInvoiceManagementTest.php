@@ -551,7 +551,11 @@ class StudentInvoiceManagementTest extends TestCase
         $response = $this->actingAs($user)->get(route('student-invoices.preview', $student));
 
         $response->assertOk();
-        $response->assertSee($student->full_name);
+        $response->assertSee(trim(collect([
+            trim((string) $student->preferred_name),
+            trim((string) ($student->name_en ?: $student->full_name)),
+            trim((string) $student->name_mm),
+        ])->filter()->unique()->implode(' / ')));
         $response->assertSee('Primary Tuition');
     }
 

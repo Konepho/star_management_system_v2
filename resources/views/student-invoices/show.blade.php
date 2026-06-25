@@ -19,7 +19,13 @@
                 </a>
             </div>
         </div>
-    </x-slot>
+</x-slot>
+
+    @php($invoiceStudentName = trim(collect([
+        trim((string) $invoice->student?->preferred_name),
+        trim((string) ($invoice->student?->name_en ?: $invoice->student?->full_name)),
+        trim((string) $invoice->student?->name_mm),
+    ])->filter()->unique()->implode(' / ')) ?: '—')
 
     <div class="py-12">
         <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
@@ -74,7 +80,7 @@
                         <dl class="mt-4 space-y-3 text-sm">
                             <div>
                                 <dt class="font-medium text-slate-500">Student</dt>
-                                <dd class="text-slate-900">{{ $invoice->student?->full_name }}</dd>
+                                <dd class="text-slate-900">{{ $invoiceStudentName }}</dd>
                             </div>
                             <div>
                                 <dt class="font-medium text-slate-500">Admission No</dt>

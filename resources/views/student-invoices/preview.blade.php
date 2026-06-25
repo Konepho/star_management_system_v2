@@ -3,13 +3,19 @@
         <h2 class="text-xl font-semibold leading-tight text-slate-900">{{ __('Invoice Preview') }}</h2>
     </x-slot>
 
+    @php($studentDisplayName = trim(collect([
+        trim((string) $student->preferred_name),
+        trim((string) ($student->name_en ?: $student->full_name)),
+        trim((string) $student->name_mm),
+    ])->filter()->unique()->implode(' / ')) ?: '—')
+
     <div class="py-12">
         <div class="mx-auto max-w-6xl space-y-6 sm:px-6 lg:px-8">
             <div class="overflow-hidden bg-white shadow-sm sm:rounded-lg">
                 <div class="p-6">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                            <h3 class="text-lg font-semibold text-slate-900">{{ $student->full_name }}</h3>
+                            <h3 class="text-lg font-semibold text-slate-900">{{ $studentDisplayName }}</h3>
                             <p class="mt-1 text-sm text-slate-600">
                                 {{ $activeEnrollment?->academicYear?->name ?? 'No active enrollment' }}
                                 @if ($activeEnrollment?->grade)

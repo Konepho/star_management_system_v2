@@ -82,7 +82,7 @@ class StudentInvoiceController extends Controller
 
                     return [
                         $student->id . ':' . $enrollment->academic_year_id => [
-                            'student_label' => $student->full_name . ' (' . $student->admission_no . ')',
+                            'student_label' => $this->invoiceStudentName($student) . ' (' . $student->admission_no . ')',
                             'academic_year' => $enrollment->academicYear?->name,
                             'grade' => $enrollment->grade?->name,
                             'section' => $enrollment->section?->name,
@@ -437,6 +437,19 @@ class StudentInvoiceController extends Controller
             'bilingual' => trim(collect([$englishName, $burmeseName])->filter()->implode(' / ')) ?: '—',
             default => trim(collect([$preferredName, $englishName, $burmeseName])->filter()->unique()->implode(' / ')) ?: '—',
         };
+    }
+
+    protected function invoiceStudentName(?Student $student): string
+    {
+        if (! $student) {
+            return '—';
+        }
+
+        return trim(collect([
+            trim((string) $student->preferred_name),
+            trim((string) ($student->name_en ?: $student->full_name)),
+            trim((string) $student->name_mm),
+        ])->filter()->unique()->implode(' / ')) ?: '—';
     }
 
     protected function canManageInvoiceAction(?string $action): bool

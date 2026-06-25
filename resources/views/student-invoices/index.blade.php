@@ -79,13 +79,18 @@
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 bg-white">
                                     @foreach ($invoices as $invoice)
+                                        @php($invoiceStudentName = trim(collect([
+                                            trim((string) $invoice->student?->preferred_name),
+                                            trim((string) ($invoice->student?->name_en ?: $invoice->student?->full_name)),
+                                            trim((string) $invoice->student?->name_mm),
+                                        ])->filter()->unique()->implode(' / ')) ?: '—')
                                         <tr class="align-top">
                                             <td class="px-3 py-3">
                                                 <div class="break-words text-sm font-semibold text-slate-900">{{ $invoice->invoice_no }}</div>
                                                 <div class="mt-1 text-xs text-slate-500">{{ $invoice->issue_date?->format('Y-m-d') }}</div>
                                             </td>
                                             <td class="px-3 py-3">
-                                                <div class="break-words text-sm font-medium text-slate-900">{{ $invoice->student?->full_name }}</div>
+                                                <div class="break-words text-sm font-medium text-slate-900">{{ $invoiceStudentName }}</div>
                                                 <div class="mt-1 break-words text-xs text-slate-500">
                                                     {{ $invoice->student?->admission_no ?: '—' }}
                                                     @if ($invoice->grade)
