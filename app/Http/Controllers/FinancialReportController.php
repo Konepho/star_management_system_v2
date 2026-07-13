@@ -6,6 +6,7 @@ use App\Models\AcademicYear;
 use App\Models\Enrollment;
 use App\Models\FeeStructure;
 use App\Models\Student;
+use App\Models\StudentExtraClassRegistration;
 use App\Models\StudentInvoice;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -14,6 +15,12 @@ use Illuminate\View\View;
 
 class FinancialReportController extends Controller
 {
+    protected const REPORTABLE_INVOICE_STATUSES = [
+        StudentInvoice::STATUS_ISSUED,
+        StudentInvoice::STATUS_PARTIAL,
+        StudentInvoice::STATUS_PAID,
+    ];
+
     public function __invoke(Request $request): View
     {
         $academicYears = AcademicYear::query()
@@ -48,21 +55,29 @@ class FinancialReportController extends Controller
             ->whereHas('student', fn ($query) => $query->where('status', 'active'))
             ->get();
 
-        $students = $enrollments->map->student->filter()->values();
-
         $feeStructures = FeeStructure::query()
             ->with(['feeCategory', 'installments'])
             ->where('academic_year_id', $selectedAcademicYear->id)
             ->where('status', 'active')
             ->where('is_optional', false)
             ->get();
+        $extraRegistrations = StudentExtraClassRegistration::query()
+            ->with(['student', 'offering'])
+            ->where('academic_year_id', $selectedAcademicYear->id)
+            ->where('status', StudentExtraClassRegistration::STATUS_ACTIVE)
+            ->whereHas('student', fn ($query) => $query->where('status', 'active'))
+            ->get();
 
-        $projection = $this->buildProjectionData($enrollments, $feeStructures, $academicMonths);
+        $projection = $this->buildProjectionData($enrollments, $feeStructures, $extraRegistrations, $academicMonths);
 
         $invoices = StudentInvoice::query()
             ->with(['student', 'grade', 'payments', 'discounts'])
             ->where('academic_year_id', $selectedAcademicYear->id)
+            ->whereIn('status', self::REPORTABLE_INVOICE_STATUSES)
             ->get();
+
+        $students = $this->buildReportStudents($enrollments, $extraRegistrations);
+        $studentMix = $this->buildStudentMixData($enrollments, $extraRegistrations);
 
         $actuals = $this->buildActualData($invoices, $academicMonths);
         $selectedMonthKeys = $this->selectedPeriodMonthKeys($period, $selectedMonthKey, $selectedQuarterKey, $academicMonths, $quarterOptions);
@@ -83,8 +98,9 @@ class FinancialReportController extends Controller
         $collectionRate = $projectedForPeriod > 0
             ? round(($collectedForPeriod / $projectedForPeriod) * 100, 1)
             : 0.0;
+        $streamSummaries = $this->buildStreamSummaries($invoices);
 
-        $gradeSummaries = $this->buildGradeSummaries($enrollments, $projection['gradeProjected'], $invoices);
+        $gradeSummaries = $this->buildGradeSummaries($enrollments, $extraRegistrations, $projection['gradeProjected'], $invoices);
         $chartData = $academicMonths->map(function (array $month) use ($projection, $actuals) {
             return [
                 'label' => $month['short_label'],
@@ -94,6 +110,8 @@ class FinancialReportController extends Controller
             ];
         })->values();
         $chartMax = max(1, (float) $chartData->max(fn (array $point) => max($point['projected'], $point['billed'], $point['collected'])));
+        $cashTimelineData = $this->buildCashTimelineData($invoices);
+        $cashTimelineMax = max(1, (float) $cashTimelineData->max(fn (array $point) => $point['collected'] ?? 0));
 
         return view('reports.financial', [
             'academicYears' => $academicYears,
@@ -105,7 +123,11 @@ class FinancialReportController extends Controller
             'selectedQuarterKey' => $selectedQuarterKey,
             'periodLabel' => $this->periodLabel($period, $selectedMonthKey, $selectedQuarterKey, $monthOptions, $quarterOptions, $selectedAcademicYear),
             'studentsCount' => $students->count(),
+            'academicStudentsCount' => $studentMix['academic_students_count'],
+            'extraClassOnlyStudentsCount' => $studentMix['extra_class_only_students_count'],
             'projectedAnnualIncome' => (float) $projection['monthly']->sum(),
+            'projectedAcademicAnnualIncome' => (float) collect($projection['streamProjected']['academic'])->sum(),
+            'projectedExtraClassAnnualIncome' => (float) collect($projection['streamProjected']['extra_class'])->sum(),
             'projectedForPeriod' => (float) $projectedForPeriod,
             'billedForPeriod' => (float) $billedForPeriod,
             'collectedForPeriod' => (float) $collectedForPeriod,
@@ -113,9 +135,12 @@ class FinancialReportController extends Controller
             'collectionGap' => (float) $collectionGap,
             'collectionRate' => (float) $collectionRate,
             'outstandingForAcademicYear' => (float) $invoices->sum(fn (StudentInvoice $invoice) => $invoice->balance_due),
+            'streamSummaries' => $streamSummaries,
             'gradeSummaries' => $gradeSummaries,
             'chartData' => $chartData,
             'chartMax' => $chartMax,
+            'cashTimelineData' => $cashTimelineData,
+            'cashTimelineMax' => $cashTimelineMax,
         ]);
     }
 
@@ -157,9 +182,13 @@ class FinancialReportController extends Controller
             });
     }
 
-    protected function buildProjectionData(Collection $enrollments, Collection $feeStructures, Collection $academicMonths): array
+    protected function buildProjectionData(Collection $enrollments, Collection $feeStructures, Collection $extraRegistrations, Collection $academicMonths): array
     {
         $monthlyTotals = $academicMonths->mapWithKeys(fn (array $month) => [$month['key'] => 0.0]);
+        $streamProjected = [
+            'academic' => $academicMonths->mapWithKeys(fn (array $month) => [$month['key'] => 0.0]),
+            'extra_class' => $academicMonths->mapWithKeys(fn (array $month) => [$month['key'] => 0.0]),
+        ];
         $gradeProjected = [];
 
         foreach ($enrollments as $enrollment) {
@@ -176,6 +205,7 @@ class FinancialReportController extends Controller
 
                 foreach ($allocation as $monthKey => $amount) {
                     $monthlyTotals[$monthKey] = (float) $monthlyTotals[$monthKey] + (float) $amount;
+                    $streamProjected['academic'][$monthKey] = (float) $streamProjected['academic'][$monthKey] + (float) $amount;
                 }
 
                 $gradeId = $enrollment->grade_id ?? 0;
@@ -183,8 +213,34 @@ class FinancialReportController extends Controller
             }
         }
 
+        foreach ($extraRegistrations as $registration) {
+            $offering = $registration->offering;
+
+            if (! $offering) {
+                continue;
+            }
+
+            $monthKeys = $academicMonths->pluck('key')->all();
+            $registrationMonthKey = optional($registration->registration_date)->format('Y-m');
+            $targetMonthKey = in_array($registrationMonthKey, $monthKeys, true)
+                ? $registrationMonthKey
+                : $monthKeys[0];
+
+            $monthlyTotals[$targetMonthKey] = (float) $monthlyTotals[$targetMonthKey] + (float) $offering->fee_amount;
+            $streamProjected['extra_class'][$targetMonthKey] = (float) $streamProjected['extra_class'][$targetMonthKey] + (float) $offering->fee_amount;
+
+            $matchingEnrollment = $enrollments->first(function (Enrollment $enrollment) use ($registration): bool {
+                return (int) $enrollment->student_id === (int) $registration->student_id;
+            });
+            $gradeId = $matchingEnrollment?->grade_id
+                ?? $registration->student?->grade_id
+                ?? 0;
+            $gradeProjected[$gradeId] = ($gradeProjected[$gradeId] ?? 0) + (float) $offering->fee_amount;
+        }
+
         return [
             'monthly' => $monthlyTotals,
+            'streamProjected' => $streamProjected,
             'gradeProjected' => $gradeProjected,
         ];
     }
@@ -289,6 +345,10 @@ class FinancialReportController extends Controller
             }
 
             foreach ($invoice->payments as $payment) {
+                if ($payment->isReversed()) {
+                    continue;
+                }
+
                 $paymentMonthKey = optional($payment->payment_date)->format('Y-m');
 
                 if ($paymentMonthKey && $collectedMonthly->has($paymentMonthKey)) {
@@ -302,6 +362,57 @@ class FinancialReportController extends Controller
             'collectedMonthly' => $collectedMonthly,
             'discountMonthly' => $discountMonthly,
         ];
+    }
+
+    protected function buildCashTimelineData(Collection $invoices): Collection
+    {
+        $paymentMonths = collect();
+
+        foreach ($invoices as $invoice) {
+            foreach ($invoice->payments as $payment) {
+                if ($payment->isReversed() || ! $payment->payment_date) {
+                    continue;
+                }
+
+                $paymentMonths->push($payment->payment_date->copy()->startOfMonth());
+            }
+        }
+
+        if ($paymentMonths->isEmpty()) {
+            return collect();
+        }
+
+        $start = $paymentMonths->min()->copy()->startOfMonth();
+        $end = $paymentMonths->max()->copy()->startOfMonth();
+        $timeline = collect();
+        $cursor = $start->copy();
+
+        while ($cursor->lte($end)) {
+            $monthKey = $cursor->format('Y-m');
+            $collected = 0.0;
+
+            foreach ($invoices as $invoice) {
+                foreach ($invoice->payments as $payment) {
+                    if ($payment->isReversed() || ! $payment->payment_date) {
+                        continue;
+                    }
+
+                    if ($payment->payment_date->format('Y-m') === $monthKey) {
+                        $collected += (float) $payment->amount;
+                    }
+                }
+            }
+
+            $timeline->push([
+                'key' => $monthKey,
+                'label' => $cursor->format('M Y'),
+                'collected' => $collected,
+            ]);
+
+            $cursor->addMonth();
+        }
+
+        return $timeline;
     }
 
     protected function selectedPeriodMonthKeys(
@@ -341,20 +452,53 @@ class FinancialReportController extends Controller
         return $academicYear->name;
     }
 
-    protected function buildGradeSummaries(Collection $enrollments, array $gradeProjected, Collection $invoices): Collection
+    protected function buildGradeSummaries(Collection $enrollments, Collection $extraRegistrations, array $gradeProjected, Collection $invoices): Collection
     {
-        $grades = $enrollments
-            ->groupBy(fn (Enrollment $enrollment) => $enrollment->grade_id ?? 0)
-            ->map(function (Collection $groupEnrollments, $gradeId) use ($gradeProjected, $invoices) {
-                $studentIds = $groupEnrollments->pluck('student_id')->all();
-                $gradeInvoices = $invoices->filter(fn (StudentInvoice $invoice) => in_array($invoice->student_id, $studentIds, true));
-                $gradeName = $groupEnrollments->first()?->grade?->name ?? 'Unassigned Grade';
-                $gradeGroup = $groupEnrollments->first()?->grade?->grade_group_label;
+        $gradeBuckets = [];
+
+        foreach ($enrollments as $enrollment) {
+            $student = $enrollment->student;
+
+            if (! $student) {
+                continue;
+            }
+
+            $gradeId = $enrollment->grade_id ?? $student->grade_id ?? 0;
+            $gradeBuckets[$gradeId] ??= [
+                'grade_name' => $enrollment->grade?->name ?? $student->grade?->name ?? $this->extraClassOnlyGradeLabel(),
+                'grade_group' => $enrollment->grade?->grade_group_label ?? $student->grade?->grade_group_label,
+                'student_ids' => [],
+            ];
+            $gradeBuckets[$gradeId]['student_ids'][(int) $student->id] = true;
+        }
+
+        foreach ($extraRegistrations as $registration) {
+            $student = $registration->student;
+
+            if (! $student) {
+                continue;
+            }
+
+            $matchingEnrollment = $enrollments->first(fn (Enrollment $enrollment) => (int) $enrollment->student_id === (int) $registration->student_id);
+            $gradeId = $matchingEnrollment?->grade_id ?? $student->grade_id ?? 0;
+
+            $gradeBuckets[$gradeId] ??= [
+                'grade_name' => $matchingEnrollment?->grade?->name ?? $student->grade?->name ?? $this->extraClassOnlyGradeLabel(),
+                'grade_group' => $matchingEnrollment?->grade?->grade_group_label ?? $student->grade?->grade_group_label,
+                'student_ids' => [],
+            ];
+            $gradeBuckets[$gradeId]['student_ids'][(int) $student->id] = true;
+        }
+
+        $grades = collect($gradeBuckets)
+            ->map(function (array $bucket, $gradeId) use ($gradeProjected, $invoices) {
+                $studentIds = array_map('intval', array_keys($bucket['student_ids']));
+                $gradeInvoices = $invoices->filter(fn (StudentInvoice $invoice) => in_array((int) $invoice->student_id, $studentIds, true));
 
                 return [
-                    'grade_name' => $gradeName,
-                    'grade_group' => $gradeGroup,
-                    'students_count' => $groupEnrollments->count(),
+                    'grade_name' => $bucket['grade_name'],
+                    'grade_group' => $bucket['grade_group'],
+                    'students_count' => count($studentIds),
                     'projected_amount' => (float) ($gradeProjected[$gradeId] ?? 0),
                     'billed_amount' => (float) $gradeInvoices->sum('total_amount'),
                     'collected_amount' => (float) $gradeInvoices->sum(fn (StudentInvoice $invoice) => $invoice->paid_amount),
@@ -366,5 +510,91 @@ class FinancialReportController extends Controller
             ->values();
 
         return $grades;
+    }
+
+    protected function buildReportStudents(Collection $enrollments, Collection $extraRegistrations): Collection
+    {
+        $students = [];
+
+        foreach ($enrollments as $enrollment) {
+            if ($enrollment->student) {
+                $students[(int) $enrollment->student->id] = $enrollment->student;
+            }
+        }
+
+        foreach ($extraRegistrations as $registration) {
+            if ($registration->student) {
+                $students[(int) $registration->student->id] = $registration->student;
+            }
+        }
+
+        return collect($students)->values();
+    }
+
+    protected function buildStudentMixData(Collection $enrollments, Collection $extraRegistrations): array
+    {
+        $academicStudentIds = $enrollments
+            ->pluck('student_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $extraStudentIds = $extraRegistrations
+            ->pluck('student_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $extraClassOnlyStudentsCount = $extraStudentIds
+            ->reject(fn (int $studentId) => $academicStudentIds->contains($studentId))
+            ->count();
+
+        return [
+            'academic_students_count' => $academicStudentIds->count(),
+            'extra_class_only_students_count' => $extraClassOnlyStudentsCount,
+        ];
+    }
+
+    protected function buildStreamSummaries(Collection $invoices): Collection
+    {
+        $streamLabels = StudentInvoice::invoiceStreamOptions();
+
+        return collect([
+            StudentInvoice::STREAM_ACADEMIC,
+            StudentInvoice::STREAM_EXTRA_CLASS,
+            StudentInvoice::STREAM_MIXED,
+            StudentInvoice::STREAM_OTHER,
+        ])->map(function (string $stream) use ($invoices, $streamLabels) {
+            $streamInvoices = $invoices->filter(fn (StudentInvoice $invoice) => $this->normalizeInvoiceStream($invoice) === $stream);
+
+            return [
+                'key' => $stream,
+                'label' => $streamLabels[$stream] ?? ucfirst(str_replace('_', ' ', $stream)),
+                'invoice_count' => $streamInvoices->count(),
+                'billed_amount' => (float) $streamInvoices->sum('total_amount'),
+                'collected_amount' => (float) $streamInvoices->sum(fn (StudentInvoice $invoice) => $invoice->paid_amount),
+                'outstanding_amount' => (float) $streamInvoices->sum(fn (StudentInvoice $invoice) => $invoice->balance_due),
+            ];
+        })->values();
+    }
+
+    protected function normalizeInvoiceStream(StudentInvoice $invoice): string
+    {
+        if (is_string($invoice->invoice_stream) && $invoice->invoice_stream !== '') {
+            return $invoice->invoice_stream;
+        }
+
+        if ($invoice->enrollment_id) {
+            return StudentInvoice::STREAM_ACADEMIC;
+        }
+
+        return StudentInvoice::STREAM_OTHER;
+    }
+
+    protected function extraClassOnlyGradeLabel(): string
+    {
+        return 'Extra Class Only Student';
     }
 }

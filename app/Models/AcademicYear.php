@@ -57,6 +57,16 @@ class AcademicYear extends Model
         return $this->hasMany(ExternalExamSession::class);
     }
 
+    public function extraClassOfferings(): HasMany
+    {
+        return $this->hasMany(ExtraClassOffering::class);
+    }
+
+    public function studentExtraClassRegistrations(): HasMany
+    {
+        return $this->hasMany(StudentExtraClassRegistration::class);
+    }
+
     public function staffSectionAssignments(): HasMany
     {
         return $this->hasMany(StaffSectionAssignment::class);

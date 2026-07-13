@@ -108,6 +108,10 @@
                                 <dd class="text-slate-900">{{ \App\Models\StudentInvoice::billingPeriodTypeOptions()[$invoice->billing_period_type] ?? ucfirst((string) $invoice->billing_period_type) }}</dd>
                             </div>
                             <div>
+                                <dt class="font-medium text-slate-500">Invoice Stream</dt>
+                                <dd class="text-slate-900">{{ $invoice->invoice_stream_label }}</dd>
+                            </div>
+                            <div>
                                 <dt class="font-medium text-slate-500">Academic Year</dt>
                                 <dd class="text-slate-900">{{ $invoice->academicYear?->name }}</dd>
                             </div>
@@ -160,8 +164,12 @@
                                 <dd class="text-lg font-semibold text-rose-700">{{ number_format((float) $invoice->balance_due, 2) }}</dd>
                             </div>
                             <div>
-                                <dt class="font-medium text-slate-500">Notes</dt>
+                                <dt class="font-medium text-slate-500">Parent / Printable Notes</dt>
                                 <dd class="text-slate-900">{{ $invoice->notes ?: '—' }}</dd>
+                            </div>
+                            <div>
+                                <dt class="font-medium text-slate-500">Internal Finance Notes</dt>
+                                <dd class="text-slate-900 whitespace-pre-line">{{ $invoice->internal_notes ?: '—' }}</dd>
                             </div>
                         </dl>
                     </div>

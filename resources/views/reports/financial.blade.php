@@ -3,7 +3,7 @@
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h2 class="text-xl font-semibold leading-tight text-slate-900">{{ __('Financial Report') }}</h2>
-                <p class="mt-1 text-sm text-slate-700">See projected school income from enrolled students, plus billed, collected, and outstanding amounts.</p>
+                <p class="mt-1 text-sm text-slate-700">See projected school income from enrolled students and extra classes, plus billed, collected, and outstanding amounts.</p>
             </div>
             <a href="{{ route('student-invoices.index') }}" class="inline-flex items-center justify-center rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
                 Open Student Invoices
@@ -21,14 +21,14 @@
                         </div>
                         <h3 class="mt-4 text-3xl font-semibold tracking-tight">Track projected income and real collections in one place.</h3>
                         <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-200">
-                            This report calculates projected core income from enrolled students and active non-optional fee structures, then compares that with actual invoices and payments.
+                            This report calculates projected core income from enrolled students, active non-optional fee structures, and active extra class registrations, then compares that with actual invoices and payments.
                         </p>
 
                         <div class="mt-6 grid gap-4 sm:grid-cols-3">
                             <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
                                 <div class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100">Academic Year</div>
                                 <div class="mt-2 text-2xl font-semibold">{{ $selectedAcademicYear->name }}</div>
-                                <div class="mt-1 text-xs text-slate-300">{{ $studentsCount }} active enrolled student(s)</div>
+                                <div class="mt-1 text-xs text-slate-300">{{ $studentsCount }} active academic or extra-class student(s)</div>
                             </div>
                             <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
                                 <div class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100">Selected Period</div>
@@ -99,7 +99,7 @@
                     <div class="p-6">
                         <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Projected Academic-Year Income</div>
                         <div class="mt-3 text-3xl font-semibold tracking-tight text-slate-900">{{ number_format($projectedAnnualIncome, 2) }}</div>
-                        <div class="mt-2 text-sm text-slate-500">Based on active enrolled students and core fee structures</div>
+                        <div class="mt-2 text-sm text-slate-500">Based on active enrolled students, core fee structures, and active extra class registrations</div>
                     </div>
                 </div>
 
@@ -154,6 +154,46 @@
                 </div>
             </div>
 
+            <div class="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+                <div class="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
+                    <div class="border-b border-slate-200 px-6 py-5">
+                        <h3 class="text-lg font-semibold text-slate-900">Student Mix</h3>
+                        <p class="mt-1 text-sm text-slate-500">See how much of this academic year comes from regular academic students versus extra-class-only students.</p>
+                    </div>
+                    <div class="grid gap-4 p-6 md:grid-cols-2">
+                        <div class="rounded-2xl bg-slate-50 p-4">
+                            <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Academic Students</div>
+                            <div class="mt-2 text-3xl font-semibold text-slate-900">{{ number_format($academicStudentsCount) }}</div>
+                            <div class="mt-2 text-sm text-slate-500">Students with an active academic enrollment in this year</div>
+                        </div>
+                        <div class="rounded-2xl bg-sky-50 p-4">
+                            <div class="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Extra Class Only Students</div>
+                            <div class="mt-2 text-3xl font-semibold text-sky-900">{{ number_format($extraClassOnlyStudentsCount) }}</div>
+                            <div class="mt-2 text-sm text-sky-800">Students billed through extra classes without a main academic enrollment</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
+                    <div class="border-b border-slate-200 px-6 py-5">
+                        <h3 class="text-lg font-semibold text-slate-900">Income Mix</h3>
+                        <p class="mt-1 text-sm text-slate-500">Separate projected income by core academic fees and extra class fees.</p>
+                    </div>
+                    <div class="grid gap-4 p-6 md:grid-cols-2">
+                        <div class="rounded-2xl bg-slate-50 p-4">
+                            <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Projected Academic Income</div>
+                            <div class="mt-2 text-2xl font-semibold text-slate-900">{{ number_format($projectedAcademicAnnualIncome, 2) }}</div>
+                            <div class="mt-2 text-sm text-slate-500">From active non-optional fee structures linked to academic enrollments</div>
+                        </div>
+                        <div class="rounded-2xl bg-emerald-50 p-4">
+                            <div class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Projected Extra Class Income</div>
+                            <div class="mt-2 text-2xl font-semibold text-emerald-900">{{ number_format($projectedExtraClassAnnualIncome, 2) }}</div>
+                            <div class="mt-2 text-sm text-emerald-800">From active extra class registrations in this academic year</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
                 <div class="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
                     <div class="border-b border-slate-200 px-6 py-5">
@@ -197,12 +237,37 @@
                 <div class="space-y-6">
                     <div class="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
                         <div class="border-b border-slate-200 px-6 py-5">
+                            <h3 class="text-lg font-semibold text-slate-900">Invoice Stream Snapshot</h3>
+                            <p class="mt-1 text-sm text-slate-500">Compare billed, collected, and outstanding balances by invoice stream.</p>
+                        </div>
+                        <div class="space-y-3 p-6">
+                            @foreach ($streamSummaries as $stream)
+                                <div class="rounded-2xl border border-slate-200 p-4">
+                                    <div class="flex items-start justify-between gap-4">
+                                        <div>
+                                            <div class="text-sm font-semibold text-slate-900">{{ $stream['label'] }}</div>
+                                            <div class="mt-1 text-xs text-slate-500">{{ $stream['invoice_count'] }} invoice(s)</div>
+                                        </div>
+                                        <div class="text-right text-xs text-slate-500">
+                                            <div>Billed: <span class="font-semibold text-indigo-700">{{ number_format($stream['billed_amount'], 2) }}</span></div>
+                                            <div class="mt-1">Collected: <span class="font-semibold text-emerald-700">{{ number_format($stream['collected_amount'], 2) }}</span></div>
+                                            <div class="mt-1">Outstanding: <span class="font-semibold text-rose-700">{{ number_format($stream['outstanding_amount'], 2) }}</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div class="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
+                        <div class="border-b border-slate-200 px-6 py-5">
                             <h3 class="text-lg font-semibold text-slate-900">Report Notes</h3>
                             <p class="mt-1 text-sm text-slate-500">How the projected side is calculated.</p>
                         </div>
                         <div class="space-y-4 p-6 text-sm text-slate-600">
                             <p>Only active students in the selected academic year are included.</p>
-                            <p>Only active, non-optional fee structures are used for projected income.</p>
+                            <p>Only active, non-optional fee structures are used for core projected income.</p>
+                            <p>Active extra class registrations are added once using the academic-year offering fee for that student registration.</p>
                             <p>Monthly fees are spread across academic-year months, quarterly fees are spread across 3-month blocks, and installment fees follow their installment due dates when available.</p>
                             <p>Annual fees are placed at the start of the academic year, and one-time fees follow the student's admission month when possible.</p>
                         </div>
@@ -246,8 +311,45 @@
 
             <div class="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
                 <div class="border-b border-slate-200 px-6 py-5">
+                    <h3 class="text-lg font-semibold text-slate-900">Actual Cash Collection Timeline</h3>
+                    <p class="mt-1 text-sm text-slate-500">Real payment months for this academic year's invoices, including payments collected before the academic year starts.</p>
+                </div>
+                <div class="p-6">
+                    @if ($cashTimelineData->isEmpty())
+                        <div class="rounded-2xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">No posted payments yet for this academic year's invoices.</div>
+                    @else
+                        <div class="mb-4 flex flex-wrap items-center gap-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                            <span class="inline-flex items-center gap-2"><span class="h-3 w-3 rounded-sm bg-emerald-500"></span>Collected Cash</span>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <div class="min-w-[720px]">
+                                <div class="flex h-72 items-end gap-4">
+                                    @foreach ($cashTimelineData as $point)
+                                        @php
+                                            $cashHeight = $cashTimelineMax > 0 ? max(3, ($point['collected'] / $cashTimelineMax) * 100) : 0;
+                                        @endphp
+                                        <div class="flex flex-1 flex-col items-center gap-3">
+                                            <div class="flex h-60 w-full items-end justify-center rounded-2xl bg-slate-50 px-2 py-3">
+                                                <div class="w-8 rounded-t-md bg-emerald-500" style="height: {{ $point['collected'] > 0 ? $cashHeight : 0 }}%" title="Collected: {{ number_format($point['collected'], 2) }}"></div>
+                                            </div>
+                                            <div class="text-center">
+                                                <div class="text-xs font-semibold text-slate-700">{{ $point['label'] }}</div>
+                                                <div class="mt-1 text-[11px] text-slate-500">{{ number_format($point['collected'], 0) }}</div>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            <div class="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
+                <div class="border-b border-slate-200 px-6 py-5">
                     <h3 class="text-lg font-semibold text-slate-900">Grade / Class Financial Summary</h3>
-                    <p class="mt-1 text-sm text-slate-500">Projected and actual finance numbers grouped by enrolled grade.</p>
+                    <p class="mt-1 text-sm text-slate-500">Projected and actual finance numbers grouped by grade, with a clear extra-class-only label where no academic enrollment exists.</p>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-slate-200">
@@ -278,7 +380,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="px-6 py-10 text-center text-sm text-slate-500">No active enrolled students found for this academic year.</td>
+                                    <td colspan="6" class="px-6 py-10 text-center text-sm text-slate-500">No active academic or extra-class students found for this academic year.</td>
                                 </tr>
                             @endforelse
                         </tbody>

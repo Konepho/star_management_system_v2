@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AcademicYear;
+use App\Models\AuditLog;
 use App\Models\AppSetting;
 use App\Models\DiscountDefinition;
 use App\Models\Enrollment;
@@ -13,6 +14,7 @@ use App\Models\FeeStructure;
 use App\Models\Grade;
 use App\Models\Section;
 use App\Models\Student;
+use App\Models\StudentExtraClassRegistration;
 use App\Models\StudentInvoiceDiscount;
 use App\Models\StudentDiscount;
 use App\Models\StudentInvoice;
@@ -101,8 +103,8 @@ class StudentInvoiceManagementTest extends TestCase
         $response = $this->actingAs($user)->get(route('student-invoices.create'));
 
         $response->assertOk();
-        $response->assertSee('Enrollment Billing Summary');
-        $response->assertSee('Auto-loaded from enrollment');
+        $response->assertSee('1. Student and Period');
+        $response->assertSee('Estimated Invoice Total');
         $response->assertSee('Type student name or admission no');
     }
 
@@ -120,6 +122,8 @@ class StudentInvoiceManagementTest extends TestCase
             'status' => 'issued',
             'billing_period_type' => \App\Models\StudentInvoice::PERIOD_CUSTOM,
             'billing_year_label' => 'Printable Invoice',
+            'notes' => 'Visible to parent',
+            'internal_notes' => 'Finance only',
             'total_amount' => 50000,
         ]);
         AppSetting::setValue('invoice.school_name', 'STAR International School');
@@ -140,6 +144,8 @@ class StudentInvoiceManagementTest extends TestCase
         $response->assertSee('Print Invoice');
         $response->assertSee('STAR International School');
         $response->assertSee('Aye Chan / အေးချမ်း');
+        $response->assertSee('Visible to parent');
+        $response->assertDontSee('Finance only');
     }
 
     public function test_authenticated_users_can_generate_a_student_invoice_from_applicable_fee_structures(): void
@@ -192,7 +198,75 @@ class StudentInvoiceManagementTest extends TestCase
         $this->assertEquals('2026-04', $invoice->billing_month);
         $this->assertEquals($student->id, $invoice->student_id);
         $this->assertNotNull($invoice->enrollment_id);
+        $this->assertEquals(StudentInvoice::STREAM_ACADEMIC, $invoice->invoice_stream);
         $this->assertDatabaseCount('student_invoice_items', 2);
+    }
+
+    public function test_academic_fee_rows_can_be_excluded_from_the_current_invoice_only(): void
+    {
+        $user = User::factory()->create();
+        $academicYear = AcademicYear::factory()->create();
+        $grade = Grade::factory()->create(['grade_group' => Grade::GROUP_PRIMARY]);
+        $student = Student::factory()->create();
+        $schoolWideCategory = FeeCategory::factory()->create(['name' => 'Registration Fee']);
+        $groupCategory = FeeCategory::factory()->create(['name' => 'Primary Tuition']);
+
+        $schoolWideFee = FeeStructure::factory()->create([
+            'academic_year_id' => $academicYear->id,
+            'grade_id' => null,
+            'grade_group' => null,
+            'fee_category_id' => $schoolWideCategory->id,
+            'amount' => 30000,
+            'billing_cycle' => 'one-time',
+            'status' => 'active',
+        ]);
+        $groupFee = FeeStructure::factory()->create([
+            'academic_year_id' => $academicYear->id,
+            'grade_id' => null,
+            'grade_group' => Grade::GROUP_PRIMARY,
+            'fee_category_id' => $groupCategory->id,
+            'amount' => 80000,
+            'billing_cycle' => 'monthly',
+            'status' => 'active',
+        ]);
+        $this->assignFeePlanToEnrollment($student, $academicYear, $grade, [$schoolWideFee, $groupFee]);
+
+        $excludedKey = 'fee-structure:' . $schoolWideFee->id . ':installment:base';
+
+        $response = $this->actingAs($user)->post(route('student-invoices.store'), [
+            'student_id' => $student->id,
+            'academic_year_id' => $academicYear->id,
+            'issue_date' => '2026-04-27',
+            'due_date' => '2026-05-05',
+            'status' => 'issued',
+            'billing_period_type' => \App\Models\StudentInvoice::PERIOD_MONTHLY,
+            'billing_month' => '2026-04',
+            'billing_year_label' => 'April 2026',
+            'excluded_academic_charge_keys' => [$excludedKey],
+            'excluded_academic_charge_reasons' => [
+                $excludedKey => 'Special approval',
+            ],
+        ]);
+
+        $invoice = StudentInvoice::query()->first();
+
+        $response->assertRedirect(route('student-invoices.show', $invoice));
+        $this->assertNotNull($invoice);
+        $this->assertEquals(80000.0, (float) $invoice->total_amount);
+        $this->assertDatabaseCount('student_invoice_items', 1);
+        $this->assertDatabaseHas('student_invoice_items', [
+            'student_invoice_id' => $invoice->id,
+            'fee_structure_id' => $groupFee->id,
+            'amount' => 80000,
+        ]);
+        $this->assertSame(null, $invoice->notes);
+        $this->assertStringContainsString('Academic fee exclusions: Registration Fee (Special approval)', (string) $invoice->internal_notes);
+
+        $auditLog = AuditLog::query()->latest('id')->first();
+        $this->assertNotNull($auditLog);
+        $this->assertEquals('student_invoices', $auditLog->module);
+        $this->assertEquals('Special approval', $auditLog->meta['excluded_academic_charges'][0]['reason'] ?? null);
+        $this->assertEquals('Registration Fee', $auditLog->meta['excluded_academic_charges'][0]['description'] ?? null);
     }
 
     public function test_authenticated_users_can_generate_a_student_invoice_with_fee_items(): void
@@ -240,6 +314,7 @@ class StudentInvoiceManagementTest extends TestCase
 
         $response->assertRedirect(route('student-invoices.show', $invoice));
         $this->assertEquals(80000.0, (float) $invoice->total_amount);
+        $this->assertEquals(StudentInvoice::STREAM_OTHER, $invoice->invoice_stream);
         $this->assertDatabaseHas('student_invoice_items', [
             'student_invoice_id' => $invoice->id,
             'fee_item_id' => $shirt->id,
@@ -247,6 +322,595 @@ class StudentInvoiceManagementTest extends TestCase
             'unit_price' => 25000,
             'amount' => 50000,
         ]);
+    }
+
+    public function test_authenticated_users_can_generate_a_student_invoice_with_extra_class_charges(): void
+    {
+        $user = User::factory()->create();
+        $academicYear = AcademicYear::factory()->create();
+        $grade = Grade::factory()->create(['grade_group' => Grade::GROUP_PRIMARY]);
+        $student = Student::factory()->create();
+        $this->assignFeePlanToEnrollment($student, $academicYear, $grade, []);
+
+        $extraCategory = FeeCategory::factory()->create(['name' => 'Extra Class Fee']);
+        $catalog = \App\Models\ExtraClassCatalog::query()->create([
+            'name' => 'YLE Preparation',
+            'code' => 'YLE-PREP',
+            'status' => 'active',
+        ]);
+        $offering = \App\Models\ExtraClassOffering::query()->create([
+            'extra_class_catalog_id' => $catalog->id,
+            'academic_year_id' => $academicYear->id,
+            'fee_category_id' => $extraCategory->id,
+            'fee_amount' => 95000,
+            'status' => 'active',
+        ]);
+        $registration = StudentExtraClassRegistration::query()->create([
+            'student_id' => $student->id,
+            'academic_year_id' => $academicYear->id,
+            'extra_class_offering_id' => $offering->id,
+            'registration_date' => '2026-06-10',
+            'status' => StudentExtraClassRegistration::STATUS_ACTIVE,
+        ]);
+
+        $response = $this->actingAs($user)->post(route('student-invoices.store'), [
+            'student_id' => $student->id,
+            'academic_year_id' => $academicYear->id,
+            'issue_date' => '2026-06-15',
+            'due_date' => '2026-06-20',
+            'status' => 'issued',
+            'billing_period_type' => \App\Models\StudentInvoice::PERIOD_ONE_TIME,
+            'billing_year_label' => 'YLE June 2026',
+            'extra_registration_ids' => [$registration->id],
+        ]);
+
+        $invoice = StudentInvoice::query()->first();
+
+        $response->assertRedirect(route('student-invoices.show', $invoice));
+        $this->assertEquals(95000.0, (float) $invoice->total_amount);
+        $this->assertEquals(StudentInvoice::STREAM_EXTRA_CLASS, $invoice->invoice_stream);
+        $this->assertDatabaseHas('student_invoice_items', [
+            'student_invoice_id' => $invoice->id,
+            'student_extra_class_registration_id' => $registration->id,
+            'extra_class_offering_id' => $offering->id,
+            'amount' => 95000,
+        ]);
+    }
+
+    public function test_student_with_only_extra_class_registration_can_be_invoiced_without_main_enrollment(): void
+    {
+        $user = User::factory()->create();
+        $academicYear = AcademicYear::factory()->create();
+        $student = Student::factory()->create(['status' => Student::STATUS_ACTIVE]);
+
+        $extraCategory = FeeCategory::factory()->create(['name' => 'Extra Class Fee']);
+        $catalog = \App\Models\ExtraClassCatalog::query()->create([
+            'name' => 'Chinese Club',
+            'code' => 'CHINESE-CLUB',
+            'status' => 'active',
+        ]);
+        $offering = \App\Models\ExtraClassOffering::query()->create([
+            'extra_class_catalog_id' => $catalog->id,
+            'academic_year_id' => $academicYear->id,
+            'fee_category_id' => $extraCategory->id,
+            'fee_amount' => 55000,
+            'status' => 'active',
+        ]);
+        $registration = StudentExtraClassRegistration::query()->create([
+            'student_id' => $student->id,
+            'academic_year_id' => $academicYear->id,
+            'extra_class_offering_id' => $offering->id,
+            'registration_date' => '2026-06-10',
+            'status' => StudentExtraClassRegistration::STATUS_ACTIVE,
+        ]);
+
+        $response = $this->actingAs($user)->post(route('student-invoices.store'), [
+            'student_id' => $student->id,
+            'academic_year_id' => $academicYear->id,
+            'issue_date' => '2026-06-15',
+            'due_date' => '2026-06-20',
+            'status' => 'issued',
+            'billing_period_type' => \App\Models\StudentInvoice::PERIOD_ONE_TIME,
+            'billing_year_label' => 'Extra Class Only June 2026',
+            'extra_registration_ids' => [$registration->id],
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('student_invoices', 1);
+        $invoice = StudentInvoice::query()->first();
+        $this->assertNotNull($invoice);
+        $this->assertNull($invoice->enrollment_id);
+        $this->assertNull($invoice->fee_plan_id);
+        $this->assertEquals(55000.0, (float) $invoice->total_amount);
+        $this->assertEquals(StudentInvoice::STREAM_EXTRA_CLASS, $invoice->invoice_stream);
+        $this->assertDatabaseHas('student_invoice_items', [
+            'student_invoice_id' => $invoice->id,
+            'student_extra_class_registration_id' => $registration->id,
+            'extra_class_offering_id' => $offering->id,
+            'amount' => 55000,
+        ]);
+    }
+
+    public function test_invoice_summary_labels_extra_class_only_student_clearly(): void
+    {
+        $user = User::factory()->create();
+        $academicYear = AcademicYear::factory()->create();
+        $student = Student::factory()->create(['status' => Student::STATUS_ACTIVE]);
+
+        $extraCategory = FeeCategory::factory()->create(['name' => 'Extra Class Fee']);
+        $catalog = \App\Models\ExtraClassCatalog::query()->create([
+            'name' => 'Robotics Club',
+            'code' => 'ROBOTICS',
+            'status' => 'active',
+        ]);
+        $offering = \App\Models\ExtraClassOffering::query()->create([
+            'extra_class_catalog_id' => $catalog->id,
+            'academic_year_id' => $academicYear->id,
+            'fee_category_id' => $extraCategory->id,
+            'fee_amount' => 65000,
+            'status' => 'active',
+        ]);
+        StudentExtraClassRegistration::query()->create([
+            'student_id' => $student->id,
+            'academic_year_id' => $academicYear->id,
+            'extra_class_offering_id' => $offering->id,
+            'registration_date' => '2026-06-10',
+            'status' => StudentExtraClassRegistration::STATUS_ACTIVE,
+        ]);
+
+        $response = $this->actingAs($user)->getJson(route('student-invoices.summary', [
+            'student_id' => $student->id,
+            'academic_year_id' => $academicYear->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertJsonPath('data.student_type_label', 'Extra Class Only Student');
+        $response->assertJsonPath('data.grade_label', 'Extra Class Only Student');
+        $response->assertJsonPath('data.section_label', 'Not assigned for extra class only');
+        $response->assertJsonPath('data.fee_plan_label', 'Not required for extra class only');
+    }
+
+    public function test_already_billed_extra_class_registration_cannot_be_billed_twice(): void
+    {
+        $user = User::factory()->create();
+        $academicYear = AcademicYear::factory()->create();
+        $grade = Grade::factory()->create(['grade_group' => Grade::GROUP_PRIMARY]);
+        $student = Student::factory()->create();
+        $this->assignFeePlanToEnrollment($student, $academicYear, $grade, []);
+
+        $catalog = \App\Models\ExtraClassCatalog::query()->create([
+            'name' => 'Abacus',
+            'code' => 'ABACUS',
+            'status' => 'active',
+        ]);
+        $offering = \App\Models\ExtraClassOffering::query()->create([
+            'extra_class_catalog_id' => $catalog->id,
+            'academic_year_id' => $academicYear->id,
+            'fee_amount' => 40000,
+            'status' => 'active',
+        ]);
+        $registration = StudentExtraClassRegistration::query()->create([
+            'student_id' => $student->id,
+            'academic_year_id' => $academicYear->id,
+            'extra_class_offering_id' => $offering->id,
+            'registration_date' => '2026-06-10',
+            'status' => StudentExtraClassRegistration::STATUS_ACTIVE,
+        ]);
+
+        $this->actingAs($user)->post(route('student-invoices.store'), [
+            'student_id' => $student->id,
+            'academic_year_id' => $academicYear->id,
+            'issue_date' => '2026-06-15',
+            'due_date' => '2026-06-20',
+            'status' => 'issued',
+            'billing_period_type' => \App\Models\StudentInvoice::PERIOD_MONTHLY,
+            'billing_month' => '2026-06',
+            'billing_year_label' => 'June 2026',
+            'extra_registration_ids' => [$registration->id],
+        ]);
+
+        $response = $this->actingAs($user)
+            ->from(route('student-invoices.create'))
+            ->post(route('student-invoices.store'), [
+                'student_id' => $student->id,
+                'academic_year_id' => $academicYear->id,
+                'issue_date' => '2026-06-16',
+                'due_date' => '2026-06-21',
+                'status' => 'issued',
+                'billing_period_type' => \App\Models\StudentInvoice::PERIOD_MONTHLY,
+                'billing_month' => '2026-06',
+                'billing_year_label' => 'June 2026',
+                'extra_registration_ids' => [$registration->id],
+            ]);
+
+        $response->assertRedirect(route('student-invoices.create'));
+        $response->assertSessionHasErrors('extra_registration_ids');
+    }
+
+    public function test_extra_class_registration_can_be_billed_again_in_another_month(): void
+    {
+        $user = User::factory()->create();
+        $academicYear = AcademicYear::factory()->create();
+        $grade = Grade::factory()->create(['grade_group' => Grade::GROUP_PRIMARY]);
+        $student = Student::factory()->create();
+        $this->assignFeePlanToEnrollment($student, $academicYear, $grade, []);
+
+        $catalog = \App\Models\ExtraClassCatalog::query()->create([
+            'name' => 'Abacus',
+            'code' => 'ABACUS',
+            'status' => 'active',
+        ]);
+        $offering = \App\Models\ExtraClassOffering::query()->create([
+            'extra_class_catalog_id' => $catalog->id,
+            'academic_year_id' => $academicYear->id,
+            'fee_amount' => 40000,
+            'status' => 'active',
+        ]);
+        $registration = StudentExtraClassRegistration::query()->create([
+            'student_id' => $student->id,
+            'academic_year_id' => $academicYear->id,
+            'extra_class_offering_id' => $offering->id,
+            'registration_date' => '2026-06-10',
+            'status' => StudentExtraClassRegistration::STATUS_ACTIVE,
+        ]);
+
+        $firstResponse = $this->actingAs($user)->post(route('student-invoices.store'), [
+            'student_id' => $student->id,
+            'academic_year_id' => $academicYear->id,
+            'issue_date' => '2026-06-15',
+            'due_date' => '2026-06-20',
+            'status' => 'issued',
+            'billing_period_type' => \App\Models\StudentInvoice::PERIOD_MONTHLY,
+            'billing_month' => '2026-06',
+            'billing_year_label' => 'June 2026',
+            'extra_registration_ids' => [$registration->id],
+        ]);
+
+        $firstInvoice = StudentInvoice::query()->first();
+        $firstResponse->assertRedirect(route('student-invoices.show', $firstInvoice));
+
+        $secondResponse = $this->actingAs($user)->post(route('student-invoices.store'), [
+            'student_id' => $student->id,
+            'academic_year_id' => $academicYear->id,
+            'issue_date' => '2026-07-15',
+            'due_date' => '2026-07-20',
+            'status' => 'issued',
+            'billing_period_type' => \App\Models\StudentInvoice::PERIOD_MONTHLY,
+            'billing_month' => '2026-07',
+            'billing_year_label' => 'July 2026',
+            'extra_registration_ids' => [$registration->id],
+        ]);
+
+        $secondInvoice = StudentInvoice::query()->latest('id')->first();
+        $secondResponse->assertRedirect(route('student-invoices.show', $secondInvoice));
+        $this->assertDatabaseCount('student_invoices', 2);
+        $this->assertEquals('2026-07', $secondInvoice->billing_month);
+        $this->assertDatabaseHas('student_invoice_items', [
+            'student_invoice_id' => $secondInvoice->id,
+            'student_extra_class_registration_id' => $registration->id,
+            'amount' => 40000,
+        ]);
+    }
+
+    public function test_academic_and_extra_class_invoices_can_exist_in_the_same_month_for_the_same_student(): void
+    {
+        $user = User::factory()->create();
+        $academicYear = AcademicYear::factory()->create();
+        $grade = Grade::factory()->create(['grade_group' => Grade::GROUP_PRIMARY]);
+        $student = Student::factory()->create();
+        $feeCategory = FeeCategory::factory()->create(['name' => 'Primary Tuition']);
+        $feeStructure = FeeStructure::factory()->create([
+            'academic_year_id' => $academicYear->id,
+            'grade_group' => Grade::GROUP_PRIMARY,
+            'grade_id' => null,
+            'fee_category_id' => $feeCategory->id,
+            'amount' => 80000,
+            'billing_cycle' => 'monthly',
+            'status' => 'active',
+        ]);
+        $this->assignFeePlanToEnrollment($student, $academicYear, $grade, [$feeStructure]);
+        $excludedAcademicKey = 'fee-structure:' . $feeStructure->id . ':installment:base';
+
+        $extraCategory = FeeCategory::factory()->create(['name' => 'Extra Class Fee']);
+        $catalog = \App\Models\ExtraClassCatalog::query()->create([
+            'name' => 'Abacus',
+            'code' => 'ABACUS',
+            'status' => 'active',
+        ]);
+        $offering = \App\Models\ExtraClassOffering::query()->create([
+            'extra_class_catalog_id' => $catalog->id,
+            'academic_year_id' => $academicYear->id,
+            'fee_category_id' => $extraCategory->id,
+            'fee_amount' => 40000,
+            'status' => 'active',
+        ]);
+        $registration = StudentExtraClassRegistration::query()->create([
+            'student_id' => $student->id,
+            'academic_year_id' => $academicYear->id,
+            'extra_class_offering_id' => $offering->id,
+            'registration_date' => '2026-06-10',
+            'status' => StudentExtraClassRegistration::STATUS_ACTIVE,
+        ]);
+
+        $academicResponse = $this->actingAs($user)->post(route('student-invoices.store'), [
+            'student_id' => $student->id,
+            'academic_year_id' => $academicYear->id,
+            'issue_date' => '2026-06-15',
+            'due_date' => '2026-06-20',
+            'status' => 'issued',
+            'billing_period_type' => \App\Models\StudentInvoice::PERIOD_MONTHLY,
+            'billing_month' => '2026-06',
+            'billing_year_label' => 'June 2026',
+        ]);
+
+        $academicInvoice = StudentInvoice::query()->first();
+        $academicResponse->assertRedirect(route('student-invoices.show', $academicInvoice));
+
+        $extraResponse = $this->actingAs($user)->post(route('student-invoices.store'), [
+            'student_id' => $student->id,
+            'academic_year_id' => $academicYear->id,
+            'issue_date' => '2026-06-16',
+            'due_date' => '2026-06-21',
+            'status' => 'issued',
+            'billing_period_type' => \App\Models\StudentInvoice::PERIOD_MONTHLY,
+            'billing_month' => '2026-06',
+            'billing_year_label' => 'June 2026',
+            'excluded_academic_charge_keys' => [$excludedAcademicKey],
+            'excluded_academic_charge_reasons' => [
+                $excludedAcademicKey => 'Separate extra class invoice',
+            ],
+            'extra_registration_ids' => [$registration->id],
+        ]);
+
+        $extraInvoice = StudentInvoice::query()->latest('id')->first();
+        $extraResponse->assertRedirect(route('student-invoices.show', $extraInvoice));
+        $this->assertDatabaseCount('student_invoices', 2);
+        $this->assertEquals(StudentInvoice::STREAM_ACADEMIC, $academicInvoice->invoice_stream);
+        $this->assertEquals(StudentInvoice::STREAM_EXTRA_CLASS, $extraInvoice->invoice_stream);
+        $this->assertDatabaseHas('student_invoice_items', [
+            'student_invoice_id' => $academicInvoice->id,
+            'fee_structure_id' => $feeStructure->id,
+            'amount' => 80000,
+        ]);
+        $this->assertDatabaseHas('student_invoice_items', [
+            'student_invoice_id' => $extraInvoice->id,
+            'student_extra_class_registration_id' => $registration->id,
+            'amount' => 40000,
+        ]);
+    }
+
+    public function test_invoice_stream_is_detected_as_mixed_when_academic_and_extra_class_and_other_items_are_combined(): void
+    {
+        $user = User::factory()->create();
+        $academicYear = AcademicYear::factory()->create();
+        $grade = Grade::factory()->create(['grade_group' => Grade::GROUP_PRIMARY]);
+        $student = Student::factory()->create();
+        $tuitionCategory = FeeCategory::factory()->create(['name' => 'Primary Tuition']);
+        $feeStructure = FeeStructure::factory()->create([
+            'academic_year_id' => $academicYear->id,
+            'grade_group' => Grade::GROUP_PRIMARY,
+            'grade_id' => null,
+            'fee_category_id' => $tuitionCategory->id,
+            'amount' => 80000,
+            'billing_cycle' => 'monthly',
+            'status' => 'active',
+        ]);
+        $this->assignFeePlanToEnrollment($student, $academicYear, $grade, [$feeStructure]);
+
+        $uniformCategory = FeeCategory::factory()->create([
+            'name' => 'Uniform',
+            'allow_discount' => false,
+        ]);
+        $feeItem = FeeItem::factory()->create([
+            'fee_category_id' => $uniformCategory->id,
+            'name' => 'Sports Shirt',
+            'price' => 15000,
+            'status' => 'active',
+        ]);
+
+        $extraCategory = FeeCategory::factory()->create(['name' => 'Extra Class Fee']);
+        $catalog = \App\Models\ExtraClassCatalog::query()->create([
+            'name' => 'Robotics',
+            'code' => 'ROBOTICS',
+            'status' => 'active',
+        ]);
+        $offering = \App\Models\ExtraClassOffering::query()->create([
+            'extra_class_catalog_id' => $catalog->id,
+            'academic_year_id' => $academicYear->id,
+            'fee_category_id' => $extraCategory->id,
+            'fee_amount' => 45000,
+            'status' => 'active',
+        ]);
+        $registration = StudentExtraClassRegistration::query()->create([
+            'student_id' => $student->id,
+            'academic_year_id' => $academicYear->id,
+            'extra_class_offering_id' => $offering->id,
+            'registration_date' => '2026-06-10',
+            'status' => StudentExtraClassRegistration::STATUS_ACTIVE,
+        ]);
+
+        $response = $this->actingAs($user)->post(route('student-invoices.store'), [
+            'student_id' => $student->id,
+            'academic_year_id' => $academicYear->id,
+            'issue_date' => '2026-06-15',
+            'due_date' => '2026-06-20',
+            'status' => 'issued',
+            'billing_period_type' => StudentInvoice::PERIOD_MONTHLY,
+            'billing_month' => '2026-06',
+            'billing_year_label' => 'June 2026',
+            'fee_item_ids' => [$feeItem->id],
+            'extra_registration_ids' => [$registration->id],
+        ]);
+
+        $invoice = StudentInvoice::query()->first();
+
+        $response->assertRedirect(route('student-invoices.show', $invoice));
+        $this->assertNotNull($invoice);
+        $this->assertEquals(StudentInvoice::STREAM_MIXED, $invoice->invoice_stream);
+    }
+
+    public function test_invoice_create_page_shows_when_extra_class_registrations_were_already_billed(): void
+    {
+        $user = User::factory()->create();
+        $academicYear = AcademicYear::factory()->create();
+        $grade = Grade::factory()->create(['grade_group' => Grade::GROUP_PRIMARY]);
+        $student = Student::factory()->create();
+        $this->assignFeePlanToEnrollment($student, $academicYear, $grade, []);
+
+        $catalog = \App\Models\ExtraClassCatalog::query()->create([
+            'name' => 'Abacus',
+            'code' => 'ABACUS',
+            'status' => 'active',
+        ]);
+        $offering = \App\Models\ExtraClassOffering::query()->create([
+            'extra_class_catalog_id' => $catalog->id,
+            'academic_year_id' => $academicYear->id,
+            'fee_amount' => 40000,
+            'status' => 'active',
+        ]);
+        $registration = StudentExtraClassRegistration::query()->create([
+            'student_id' => $student->id,
+            'academic_year_id' => $academicYear->id,
+            'extra_class_offering_id' => $offering->id,
+            'registration_date' => '2026-06-10',
+            'status' => StudentExtraClassRegistration::STATUS_ACTIVE,
+        ]);
+
+        $this->actingAs($user)->post(route('student-invoices.store'), [
+            'student_id' => $student->id,
+            'academic_year_id' => $academicYear->id,
+            'issue_date' => '2026-06-15',
+            'due_date' => '2026-06-20',
+            'status' => 'issued',
+            'billing_period_type' => \App\Models\StudentInvoice::PERIOD_ONE_TIME,
+            'billing_year_label' => 'Abacus June 2026',
+            'extra_registration_ids' => [$registration->id],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('student-invoices.create'));
+
+        $response->assertOk();
+        $response->assertSee('already billed');
+        $response->assertSee('All extra class registrations for this student and academic year were already billed for the selected billing period');
+    }
+
+    public function test_custom_fee_item_invoices_can_be_created_multiple_times_in_the_same_label(): void
+    {
+        $user = User::factory()->create();
+        $academicYear = AcademicYear::factory()->create();
+        $grade = Grade::factory()->create(['grade_group' => Grade::GROUP_PRIMARY]);
+        $student = Student::factory()->create();
+        $category = FeeCategory::factory()->create([
+            'name' => 'Materials',
+            'allow_discount' => false,
+        ]);
+        $feeItem = FeeItem::factory()->create([
+            'fee_category_id' => $category->id,
+            'name' => 'Workbook',
+            'price' => 12000,
+            'status' => 'active',
+        ]);
+        $this->assignFeePlanToEnrollment($student, $academicYear, $grade, []);
+
+        $firstResponse = $this->actingAs($user)->post(route('student-invoices.store'), [
+            'student_id' => $student->id,
+            'academic_year_id' => $academicYear->id,
+            'issue_date' => '2026-06-15',
+            'due_date' => '2026-06-20',
+            'status' => 'issued',
+            'billing_period_type' => StudentInvoice::PERIOD_CUSTOM,
+            'billing_year_label' => 'June Material Charges',
+            'fee_item_ids' => [$feeItem->id],
+        ]);
+
+        $firstInvoice = StudentInvoice::query()->first();
+        $firstResponse->assertRedirect(route('student-invoices.show', $firstInvoice));
+
+        $secondResponse = $this->actingAs($user)->post(route('student-invoices.store'), [
+            'student_id' => $student->id,
+            'academic_year_id' => $academicYear->id,
+            'issue_date' => '2026-06-18',
+            'due_date' => '2026-06-23',
+            'status' => 'issued',
+            'billing_period_type' => StudentInvoice::PERIOD_CUSTOM,
+            'billing_year_label' => 'June Material Charges',
+            'fee_item_ids' => [$feeItem->id],
+        ]);
+
+        $secondInvoice = StudentInvoice::query()->latest('id')->first();
+        $secondResponse->assertRedirect(route('student-invoices.show', $secondInvoice));
+        $secondResponse->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('student_invoices', 2);
+        $this->assertEquals(StudentInvoice::STREAM_OTHER, $firstInvoice->invoice_stream);
+        $this->assertEquals(StudentInvoice::STREAM_OTHER, $secondInvoice->invoice_stream);
+    }
+
+    public function test_monthly_academic_invoice_duplicate_is_still_blocked_even_when_fee_items_are_flexible(): void
+    {
+        $user = User::factory()->create();
+        $academicYear = AcademicYear::factory()->create();
+        $grade = Grade::factory()->create(['grade_group' => Grade::GROUP_PRIMARY]);
+        $student = Student::factory()->create();
+        $feeCategory = FeeCategory::factory()->create(['name' => 'Primary Tuition']);
+        $feeStructure = FeeStructure::factory()->create([
+            'academic_year_id' => $academicYear->id,
+            'grade_group' => Grade::GROUP_PRIMARY,
+            'grade_id' => null,
+            'fee_category_id' => $feeCategory->id,
+            'amount' => 80000,
+            'billing_cycle' => 'monthly',
+            'status' => 'active',
+        ]);
+        $this->assignFeePlanToEnrollment($student, $academicYear, $grade, [$feeStructure]);
+
+        $this->actingAs($user)->post(route('student-invoices.store'), [
+            'student_id' => $student->id,
+            'academic_year_id' => $academicYear->id,
+            'issue_date' => '2026-06-15',
+            'due_date' => '2026-06-20',
+            'status' => 'issued',
+            'billing_period_type' => StudentInvoice::PERIOD_MONTHLY,
+            'billing_month' => '2026-06',
+            'billing_year_label' => 'June 2026',
+        ]);
+
+        $response = $this->actingAs($user)
+            ->from(route('student-invoices.create'))
+            ->post(route('student-invoices.store'), [
+                'student_id' => $student->id,
+                'academic_year_id' => $academicYear->id,
+                'issue_date' => '2026-06-18',
+                'due_date' => '2026-06-23',
+                'status' => 'issued',
+                'billing_period_type' => StudentInvoice::PERIOD_MONTHLY,
+                'billing_month' => '2026-06',
+                'billing_year_label' => 'June 2026',
+            ]);
+
+        $response->assertRedirect(route('student-invoices.create'));
+        $response->assertSessionHasErrors('billing_period_type');
+    }
+
+    public function test_student_without_enrollment_and_without_extra_class_registration_cannot_be_invoiced(): void
+    {
+        $user = User::factory()->create();
+        $academicYear = AcademicYear::factory()->create();
+        $student = Student::factory()->create();
+
+        $response = $this->actingAs($user)
+            ->from(route('student-invoices.create'))
+            ->post(route('student-invoices.store'), [
+                'student_id' => $student->id,
+                'academic_year_id' => $academicYear->id,
+                'issue_date' => '2026-06-15',
+                'due_date' => '2026-06-20',
+                'status' => 'issued',
+                'billing_period_type' => \App\Models\StudentInvoice::PERIOD_CUSTOM,
+                'billing_year_label' => 'Invalid Extra Only',
+            ]);
+
+        $response->assertRedirect(route('student-invoices.create'));
+        $response->assertSessionHasErrors('academic_year_id');
     }
 
     public function test_active_student_percentage_discount_is_auto_applied_to_discountable_invoice_items(): void

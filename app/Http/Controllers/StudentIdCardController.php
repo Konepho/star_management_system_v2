@@ -246,7 +246,7 @@ class StudentIdCardController extends Controller
             ?? $student->fatherGuardian
             ?? $student->motherGuardian
             ?? $student->guardians->first();
-        $contactNumber = $student->emergency_contact_number ?: $student->contact_number ?: $student->phone ?: $guardian?->phone;
+        $contactNumber = $student->contact_number ?: $student->emergency_contact_number ?: $student->phone ?: $guardian?->phone;
         $displayName = $this->studentDisplayName($student);
         $secondaryName = $student->name_mm ?: 'No Burmese name';
 

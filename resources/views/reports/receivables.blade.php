@@ -31,14 +31,14 @@
                                 <div class="mt-1 text-xs text-slate-300">{{ $viewMode === 'yearly' ? 'Yearly receivables view' : 'Monthly receivables view' }}</div>
                             </div>
                             <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-                                <div class="text-xs font-semibold uppercase tracking-[0.2em] text-sky-100">Expected</div>
-                                <div class="mt-2 text-2xl font-semibold">{{ number_format($expectedForPeriod, 2) }}</div>
-                                <div class="mt-1 text-xs text-slate-300">Amount scheduled in this period</div>
+                                <div class="text-xs font-semibold uppercase tracking-[0.2em] text-sky-100">Due in Period</div>
+                                <div class="mt-2 text-2xl font-semibold">{{ number_format($periodInvoicedAmount, 2) }}</div>
+                                <div class="mt-1 text-xs text-slate-300">Invoice total for the selected due period</div>
                             </div>
                             <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-                                <div class="text-xs font-semibold uppercase tracking-[0.2em] text-sky-100">Collected</div>
-                                <div class="mt-2 text-2xl font-semibold">{{ number_format($collectedForPeriod, 2) }}</div>
-                                <div class="mt-1 text-xs text-slate-300">{{ number_format($collectionRate, 1) }}% of expected amount</div>
+                                <div class="text-xs font-semibold uppercase tracking-[0.2em] text-sky-100">Collected on Those Invoices</div>
+                                <div class="mt-2 text-2xl font-semibold">{{ number_format($periodCollectedAmount, 2) }}</div>
+                                <div class="mt-1 text-xs text-slate-300">{{ number_format($collectionRate, 1) }}% collected against those invoices</div>
                             </div>
                         </div>
                     </div>
@@ -97,7 +97,7 @@
                     <div class="p-6">
                         <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ $viewMode === 'yearly' ? 'Year Outstanding' : 'Month Outstanding' }}</div>
                         <div class="mt-3 text-3xl font-semibold tracking-tight text-rose-700">{{ number_format($periodOutstanding, 2) }}</div>
-                        <div class="mt-2 text-sm text-slate-500">Still unpaid inside {{ $currentPeriodLabel }}</div>
+                        <div class="mt-2 text-sm text-slate-500">Still unpaid from invoices due in {{ $currentPeriodLabel }}</div>
                     </div>
                 </div>
 
@@ -111,9 +111,9 @@
 
                 <div class="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
                     <div class="p-6">
-                        <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Collection Gap</div>
-                        <div class="mt-3 text-3xl font-semibold tracking-tight text-slate-900">{{ number_format($collectionGap, 2) }}</div>
-                        <div class="mt-2 text-sm text-slate-500">Expected minus collected for {{ $currentPeriodLabel }}</div>
+                        <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Future Due</div>
+                        <div class="mt-3 text-3xl font-semibold tracking-tight text-slate-900">{{ number_format($futureDueAmount, 2) }}</div>
+                        <div class="mt-2 text-sm text-slate-500">Open invoices due after today</div>
                     </div>
                 </div>
             </div>
@@ -197,21 +197,21 @@
                 <div class="space-y-6">
                     <div class="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
                         <div class="border-b border-slate-200 px-6 py-5">
-                            <h3 class="text-lg font-semibold text-slate-900">Expected by Month</h3>
-                            <p class="mt-1 text-sm text-slate-500">Outstanding amounts grouped by invoice due month.</p>
+                            <h3 class="text-lg font-semibold text-slate-900">Overdue Ageing</h3>
+                            <p class="mt-1 text-sm text-slate-500">Simple ageing bands for overdue balances.</p>
                         </div>
                         <div class="p-6">
                             <div class="space-y-3">
-                                @forelse ($expectedByMonth as $row)
+                                @forelse ($ageingSummary as $row)
                                     <div class="flex items-start justify-between gap-4 rounded-2xl border border-slate-200 p-4">
                                         <div>
                                             <div class="text-sm font-semibold text-slate-900">{{ $row['label'] }}</div>
-                                            <div class="mt-1 text-xs text-slate-500">{{ $row['count'] }} invoice(s)</div>
+                                            <div class="mt-1 text-xs text-slate-500">{{ $row['invoice_count'] }} invoice(s)</div>
                                         </div>
                                         <div class="text-right text-sm font-semibold text-slate-900">{{ number_format((float) $row['amount'], 2) }}</div>
                                     </div>
                                 @empty
-                                    <div class="rounded-2xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">No expected monthly receivables yet.</div>
+                                    <div class="rounded-2xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">No overdue receivables right now.</div>
                                 @endforelse
                             </div>
                         </div>
@@ -219,53 +219,20 @@
 
                     <div class="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
                         <div class="border-b border-slate-200 px-6 py-5">
-                            <h3 class="text-lg font-semibold text-slate-900">Expected by Year</h3>
-                            <p class="mt-1 text-sm text-slate-500">Outstanding amounts grouped by invoice due year.</p>
-                        </div>
-                        <div class="p-6">
-                            <div class="space-y-3">
-                                @forelse ($expectedByYear as $row)
-                                    <div class="flex items-start justify-between gap-4 rounded-2xl border border-slate-200 p-4">
-                                        <div>
-                                            <div class="text-sm font-semibold text-slate-900">{{ $row['label'] }}</div>
-                                            <div class="mt-1 text-xs text-slate-500">{{ $row['count'] }} invoice(s)</div>
-                                        </div>
-                                        <div class="text-right text-sm font-semibold text-slate-900">{{ number_format((float) $row['amount'], 2) }}</div>
-                                    </div>
-                                @empty
-                                    <div class="rounded-2xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">No expected yearly receivables yet.</div>
-                                @endforelse
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
-                        <div class="border-b border-slate-200 px-6 py-5">
-                            <h3 class="text-lg font-semibold text-slate-900">Collection Snapshot</h3>
-                            <p class="mt-1 text-sm text-slate-500">Quick comparison for the selected period.</p>
+                            <h3 class="text-lg font-semibold text-slate-900">Receivables Summary</h3>
+                            <p class="mt-1 text-sm text-slate-500">A simple view of what was invoiced, collected, and still remains for the selected due period.</p>
                         </div>
                         <div class="space-y-4 p-6">
-                            <div class="grid gap-3 sm:grid-cols-2">
-                                <div class="rounded-2xl bg-slate-50 p-4">
-                                    <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Collected This Month</div>
-                                    <div class="mt-2 text-lg font-semibold text-emerald-700">{{ number_format($paymentsForMonth, 2) }}</div>
-                                </div>
-                                <div class="rounded-2xl bg-slate-50 p-4">
-                                    <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Collected This Year</div>
-                                    <div class="mt-2 text-lg font-semibold text-emerald-700">{{ number_format($paymentsForYear, 2) }}</div>
-                                </div>
-                            </div>
-
                             <div class="flex items-center justify-between gap-4">
-                                <span class="text-sm text-slate-600">Expected in {{ $currentPeriodLabel }}</span>
-                                <span class="text-sm font-semibold text-slate-900">{{ number_format($expectedForPeriod, 2) }}</span>
+                                <span class="text-sm text-slate-600">Invoice total due in {{ $currentPeriodLabel }}</span>
+                                <span class="text-sm font-semibold text-slate-900">{{ number_format($periodInvoicedAmount, 2) }}</span>
                             </div>
                             <div class="flex items-center justify-between gap-4">
-                                <span class="text-sm text-slate-600">Collected in {{ $currentPeriodLabel }}</span>
-                                <span class="text-sm font-semibold text-emerald-700">{{ number_format($collectedForPeriod, 2) }}</span>
+                                <span class="text-sm text-slate-600">Collected on those invoices</span>
+                                <span class="text-sm font-semibold text-emerald-700">{{ number_format($periodCollectedAmount, 2) }}</span>
                             </div>
                             <div class="flex items-center justify-between gap-4">
-                                <span class="text-sm text-slate-600">Gap</span>
+                                <span class="text-sm text-slate-600">Still to collect</span>
                                 <span class="text-sm font-semibold text-rose-700">{{ number_format($collectionGap, 2) }}</span>
                             </div>
                             <div>

@@ -25,6 +25,11 @@ class StudentInvoice extends Model
     public const PERIOD_INSTALLMENT = 'installment';
     public const PERIOD_CUSTOM = 'custom';
 
+    public const STREAM_ACADEMIC = 'academic';
+    public const STREAM_EXTRA_CLASS = 'extra_class';
+    public const STREAM_MIXED = 'mixed';
+    public const STREAM_OTHER = 'other';
+
     public static function statusOptions(): array
     {
         return [
@@ -67,6 +72,39 @@ class StudentInvoice extends Model
         ];
     }
 
+    public static function invoiceStreamOptions(): array
+    {
+        return [
+            self::STREAM_ACADEMIC => 'Academic',
+            self::STREAM_EXTRA_CLASS => 'Extra Class',
+            self::STREAM_MIXED => 'Mixed',
+            self::STREAM_OTHER => 'Other',
+        ];
+    }
+
+    public static function detectInvoiceStream(int $academicItemCount, int $extraClassItemCount, int $otherItemCount): string
+    {
+        $streamCount = collect([
+            $academicItemCount > 0,
+            $extraClassItemCount > 0,
+            $otherItemCount > 0,
+        ])->filter()->count();
+
+        if ($streamCount > 1) {
+            return self::STREAM_MIXED;
+        }
+
+        if ($academicItemCount > 0) {
+            return self::STREAM_ACADEMIC;
+        }
+
+        if ($extraClassItemCount > 0) {
+            return self::STREAM_EXTRA_CLASS;
+        }
+
+        return self::STREAM_OTHER;
+    }
+
     protected $fillable = [
         'invoice_no',
         'student_id',
@@ -79,6 +117,7 @@ class StudentInvoice extends Model
         'due_date',
         'status',
         'billing_period_type',
+        'invoice_stream',
         'billing_month',
         'billing_quarter',
         'billing_year_label',
@@ -89,6 +128,7 @@ class StudentInvoice extends Model
         'voided_at',
         'total_amount',
         'notes',
+        'internal_notes',
     ];
 
     protected function casts(): array
@@ -248,6 +288,11 @@ class StudentInvoice extends Model
             self::PERIOD_CUSTOM => $this->billing_year_label ?: 'Custom',
             default => $this->billing_year_label ?: 'Billing Period',
         };
+    }
+
+    public function getInvoiceStreamLabelAttribute(): string
+    {
+        return self::invoiceStreamOptions()[$this->invoice_stream] ?? ucfirst(str_replace('_', ' ', (string) $this->invoice_stream));
     }
 
     public function canCollectPayments(): bool

@@ -127,6 +127,11 @@ class Student extends Model
         return $this->hasMany(StudentDailyReport::class)->orderByDesc('report_date')->orderByDesc('id');
     }
 
+    public function extraClassRegistrations(): HasMany
+    {
+        return $this->hasMany(StudentExtraClassRegistration::class)->orderByDesc('registration_date')->orderByDesc('id');
+    }
+
     public function fatherGuardian(): HasOne
     {
         return $this->hasOne(Guardian::class)->where('relation', Guardian::RELATION_FATHER);

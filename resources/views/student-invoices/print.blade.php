@@ -390,6 +390,10 @@
                         <div class="meta-value">{{ $invoice->billing_period_label }}</div>
                     </div>
                     <div class="meta-item">
+                        <div class="meta-key">Invoice Stream</div>
+                        <div class="meta-value">{{ $invoice->invoice_stream_label }}</div>
+                    </div>
+                    <div class="meta-item">
                         <div class="meta-key">Issue Date</div>
                         <div class="meta-value">{{ $invoice->issue_date?->format('Y-m-d') ?? '—' }}</div>
                     </div>
@@ -461,7 +465,7 @@
 
                 @if ($invoice->notes)
                     <div style="margin-top: 8px;">
-                        <div class="meta-key">Notes</div>
+                        <div class="meta-key">Parent Notes</div>
                         <div class="meta-value">{{ $invoice->notes }}</div>
                     </div>
                 @endif

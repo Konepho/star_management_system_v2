@@ -28,13 +28,13 @@
 
         <div>
             <x-input-label for="name" :value="__('Item Name')" />
-            <x-text-input id="name" name="name" type="text" class="mt-1 block w-full" :value="old('name', $feeItem->name)" required placeholder="School Uniform Shirt" />
+            <x-text-input id="name" name="name" type="text" class="mt-1 block w-full" :value="old('name', $feeItem->name)" required placeholder="Registration Fee" />
             <x-input-error class="mt-2" :messages="$errors->get('name')" />
         </div>
 
         <div>
             <x-input-label for="code" :value="__('Item Code')" />
-            <x-text-input id="code" name="code" type="text" class="mt-1 block w-full" :value="old('code', $feeItem->code)" required placeholder="UNI-SHIRT-28" />
+            <x-text-input id="code" name="code" type="text" class="mt-1 block w-full" :value="old('code', $feeItem->code)" required placeholder="REG-FEE" />
             <x-input-error class="mt-2" :messages="$errors->get('code')" />
         </div>
 

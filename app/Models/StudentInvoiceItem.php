@@ -15,6 +15,8 @@ class StudentInvoiceItem extends Model
         'student_invoice_id',
         'fee_structure_id',
         'fee_item_id',
+        'extra_class_offering_id',
+        'student_extra_class_registration_id',
         'fee_category_id',
         'description',
         'billing_cycle',
@@ -52,6 +54,16 @@ class StudentInvoiceItem extends Model
     public function feeItem(): BelongsTo
     {
         return $this->belongsTo(FeeItem::class);
+    }
+
+    public function extraClassOffering(): BelongsTo
+    {
+        return $this->belongsTo(ExtraClassOffering::class);
+    }
+
+    public function studentExtraClassRegistration(): BelongsTo
+    {
+        return $this->belongsTo(StudentExtraClassRegistration::class);
     }
 
     public function feeCategory(): BelongsTo

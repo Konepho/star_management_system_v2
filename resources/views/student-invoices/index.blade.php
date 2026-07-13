@@ -102,6 +102,7 @@
                                                 <div class="break-words font-medium text-slate-800">{{ $invoice->academicYear?->name }}</div>
                                                 <div class="mt-1 break-words text-xs text-slate-600">{{ $invoice->billing_period_label }}</div>
                                                 <div class="mt-1 text-xs text-slate-500">{{ \App\Models\StudentInvoice::billingPeriodTypeOptions()[$invoice->billing_period_type] ?? ucfirst((string) $invoice->billing_period_type) }}</div>
+                                                <div class="mt-1 text-xs font-semibold text-sky-700">{{ $invoice->invoice_stream_label }}</div>
                                             </td>
                                             <td class="px-3 py-3 text-xs text-slate-600">
                                                 <div>Sub: <span class="font-medium text-slate-900">{{ number_format((float) $invoice->subtotal_amount, 2) }}</span></div>

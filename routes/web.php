@@ -8,6 +8,8 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DiscountDefinitionController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\ExamController;
+use App\Http\Controllers\ExtraClassCatalogController;
+use App\Http\Controllers\ExtraClassOfferingController;
 use App\Http\Controllers\ExternalExamPaymentController;
 use App\Http\Controllers\ExternalExamRegistrationController;
 use App\Http\Controllers\ExternalExamSessionController;
@@ -31,6 +33,7 @@ use App\Http\Controllers\SectionController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\StudentDailyReportController;
+use App\Http\Controllers\StudentExtraClassRegistrationController;
 use App\Http\Controllers\StudentDiscountController;
 use App\Http\Controllers\StudentIdCardController;
 use App\Http\Controllers\StudentInvoiceController;
@@ -73,6 +76,18 @@ Route::middleware('auth')->group(function () {
     Route::resource('fee-items', FeeItemController::class)
         ->except('show')
         ->middleware('permission:fee_items.manage');
+    Route::resource('extra-class-catalogs', ExtraClassCatalogController::class)
+        ->except('show')
+        ->middleware('permission:extra_class_catalogs.manage');
+    Route::resource('extra-class-offerings', ExtraClassOfferingController::class)
+        ->except('show')
+        ->middleware('permission:extra_class_offerings.manage');
+    Route::resource('student-extra-class-registrations', StudentExtraClassRegistrationController::class)
+        ->except('show')
+        ->middlewareFor('index', 'permission:student_extra_class_registrations.view')
+        ->middlewareFor(['create', 'store'], 'permission:student_extra_class_registrations.create')
+        ->middlewareFor(['edit', 'update'], 'permission:student_extra_class_registrations.update')
+        ->middlewareFor('destroy', 'permission:student_extra_class_registrations.delete');
     Route::resource('fee-plans', FeePlanController::class)
         ->except('show')
         ->middleware('permission:fee_plans.manage');
@@ -105,6 +120,12 @@ Route::middleware('auth')->group(function () {
     Route::get('students/{student}/invoice-preview', [StudentInvoiceController::class, 'preview'])
         ->middleware('permission:student_invoices.create')
         ->name('student-invoices.preview');
+    Route::get('student-invoices/student-search', [StudentInvoiceController::class, 'studentSearch'])
+        ->middleware('permission:student_invoices.create')
+        ->name('student-invoices.student-search');
+    Route::get('student-invoices/summary', [StudentInvoiceController::class, 'summary'])
+        ->middleware('permission:student_invoices.create')
+        ->name('student-invoices.summary');
     Route::get('student-invoices/{studentInvoice}/print', [StudentInvoiceController::class, 'print'])
         ->middleware('permission:student_invoices.print')
         ->name('student-invoices.print');
