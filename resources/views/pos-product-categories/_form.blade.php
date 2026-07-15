@@ -15,6 +15,16 @@
         <x-input-error class="mt-2" :messages="$errors->get('description')" />
     </div>
     <div>
+        <x-input-label for="pos_section" :value="__('Cashier Page')" />
+        @php($selectedSection = old('pos_section', $category->pos_section ?: \App\Models\PosProductCategory::SECTION_SNACK_SHOP))
+        <select id="pos_section" name="pos_section" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+            @foreach (\App\Models\PosProductCategory::sectionOptions() as $value => $label)
+                <option value="{{ $value }}" @selected($selectedSection === $value)>{{ $label }}</option>
+            @endforeach
+        </select>
+        <x-input-error class="mt-2" :messages="$errors->get('pos_section')" />
+    </div>
+    <div>
         <x-input-label for="status" :value="__('Status')" />
         @php($selectedStatus = old('status', $category->status ?: 'active'))
         <select id="status" name="status" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">

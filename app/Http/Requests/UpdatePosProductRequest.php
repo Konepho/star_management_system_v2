@@ -19,7 +19,7 @@ class UpdatePosProductRequest extends FormRequest
         $product = $this->route('pos_product');
 
         return [
-            'pos_product_category_id' => ['nullable', 'exists:pos_product_categories,id'],
+            'pos_product_category_id' => ['required', 'exists:pos_product_categories,id'],
             'name' => ['required', 'string', 'max:255'],
             'sku' => ['nullable', 'string', 'max:100', Rule::unique('pos_products', 'sku')->ignore($product->id)],
             'description' => ['nullable', 'string'],

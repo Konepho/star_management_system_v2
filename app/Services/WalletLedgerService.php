@@ -14,8 +14,7 @@ class WalletLedgerService
 {
     public function __construct(
         protected DocumentNumberService $documentNumberService,
-    ) {
-    }
+    ) {}
 
     public function topup(Wallet $wallet, float $amount, string $paymentMethod, ?string $notes = null): WalletTransaction
     {
@@ -72,7 +71,7 @@ class WalletLedgerService
                 'balance_before' => $balanceBefore,
                 'balance_after' => $balanceAfter,
                 'status' => WalletTransaction::STATUS_POSTED,
-                'notes' => trim($reason . ($notes ? ' - ' . $notes : '')),
+                'notes' => trim($reason.($notes ? ' - '.$notes : '')),
                 'performed_by_user_id' => auth()->id(),
             ]);
         });
@@ -81,9 +80,9 @@ class WalletLedgerService
     /**
      * @param  Collection<int, array{product: PosProduct, quantity: int}>  $lines
      */
-    public function createSale(Wallet $wallet, Collection $lines, ?string $notes = null): PosSale
+    public function createSale(Wallet $wallet, Collection $lines, string $section = PosSale::SECTION_SNACK_SHOP, ?string $notes = null): PosSale
     {
-        return DB::transaction(function () use ($wallet, $lines, $notes): PosSale {
+        return DB::transaction(function () use ($wallet, $lines, $section, $notes): PosSale {
             $wallet = $wallet->newQuery()->lockForUpdate()->with('owner')->findOrFail($wallet->id);
 
             $productIds = $lines
@@ -94,6 +93,7 @@ class WalletLedgerService
 
             /** @var Collection<int, PosProduct> $lockedProducts */
             $lockedProducts = PosProduct::query()
+                ->with('category')
                 ->lockForUpdate()
                 ->whereIn('id', $productIds->all())
                 ->get()
@@ -134,13 +134,19 @@ class WalletLedgerService
             foreach ($normalizedLines as $line) {
                 if ($line['product']->status !== 'active') {
                     throw ValidationException::withMessages([
-                        'items' => $line['product']->name . ' is inactive and cannot be sold.',
+                        'items' => $line['product']->name.' is inactive and cannot be sold.',
+                    ]);
+                }
+
+                if ($line['product']->category?->status !== 'active' || $line['product']->category?->pos_section !== $section) {
+                    throw ValidationException::withMessages([
+                        'items' => $line['product']->name.' is not available in this POS section.',
                     ]);
                 }
 
                 if ($line['quantity'] > $line['product']->stock_quantity) {
                     throw ValidationException::withMessages([
-                        'items' => 'Insufficient stock for ' . $line['product']->name . '.',
+                        'items' => 'Insufficient stock for '.$line['product']->name.'.',
                     ]);
                 }
             }
@@ -151,6 +157,7 @@ class WalletLedgerService
 
             $sale = PosSale::query()->create([
                 'sale_no' => $this->documentNumberService->nextPosSaleNumber($academicYear),
+                'pos_section' => $section,
                 'wallet_id' => $wallet->id,
                 'owner_type' => $wallet->owner_type,
                 'owner_id' => $wallet->owner_id,
@@ -249,7 +256,7 @@ class WalletLedgerService
                 'balance_before' => $balanceBefore,
                 'balance_after' => $balanceAfter,
                 'status' => WalletTransaction::STATUS_POSTED,
-                'notes' => $reason ?: 'Reversed sale ' . $sale->sale_no . '.',
+                'notes' => $reason ?: 'Reversed sale '.$sale->sale_no.'.',
                 'performed_by_user_id' => auth()->id(),
                 'reference_type' => $sale->getMorphClass(),
                 'reference_id' => $sale->id,
@@ -304,7 +311,7 @@ class WalletLedgerService
                 'balance_before' => $balanceBefore,
                 'balance_after' => $balanceAfter,
                 'status' => WalletTransaction::STATUS_POSTED,
-                'notes' => $reason ?: 'Reversed top-up ' . ($transaction->transaction_no ?: '#' . $transaction->id) . '.',
+                'notes' => $reason ?: 'Reversed top-up '.($transaction->transaction_no ?: '#'.$transaction->id).'.',
                 'performed_by_user_id' => auth()->id(),
                 'reference_type' => $transaction->getMorphClass(),
                 'reference_id' => $transaction->id,

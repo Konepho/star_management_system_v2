@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Models\PosProductCategory;
 use App\Models\PosProduct;
+use App\Models\PosProductCategory;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -55,15 +55,17 @@ class PosProductManagementTest extends TestCase
             'name' => 'Drinks',
             'code' => 'DRK',
             'description' => 'Cold and hot drinks',
+            'pos_section' => PosProductCategory::SECTION_SNACK_SHOP,
             'status' => 'active',
         ]);
 
-        $category = PosProductCategory::query()->firstOrFail();
+        $category = PosProductCategory::query()->where('code', 'DRK')->firstOrFail();
 
         $storeResponse->assertRedirect(route('pos-product-categories.index'));
         $this->assertDatabaseHas('pos_product_categories', [
             'id' => $category->id,
             'name' => 'Drinks',
+            'pos_section' => PosProductCategory::SECTION_SNACK_SHOP,
             'status' => 'active',
         ]);
 

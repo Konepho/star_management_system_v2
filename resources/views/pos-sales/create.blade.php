@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="text-xl font-semibold leading-tight text-slate-900">New POS Sale</h2>
+        <h2 class="text-xl font-semibold leading-tight text-slate-900">New {{ $sectionLabel }} Sale</h2>
     </x-slot>
 
     <div class="py-12">
@@ -8,6 +8,7 @@
             <div class="overflow-hidden rounded-lg bg-white shadow-sm">
                 <div class="p-6">
                     <form method="GET" action="{{ route('pos-sales.create') }}" class="flex flex-col gap-3 sm:flex-row">
+                        <input type="hidden" name="pos_section" value="{{ $section }}">
                         <x-text-input name="identifier" type="text" class="block w-full" :value="$identifier" placeholder="Scan or enter student admission no / staff no" />
                         <x-primary-button>Find</x-primary-button>
                     </form>
@@ -33,6 +34,7 @@
                             <form method="POST" action="{{ route('pos-sales.store') }}" class="space-y-6" x-data="posSaleForm()">
                                 @csrf
                                 <input type="hidden" name="wallet_id" value="{{ $wallet->id }}">
+                                <input type="hidden" name="pos_section" value="{{ $section }}">
 
                                 <div id="pos-sale-lines" class="space-y-4">
                                     <template x-for="(line, index) in lines" :key="index">

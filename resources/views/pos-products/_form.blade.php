@@ -1,10 +1,10 @@
 <div class="grid gap-6 md:grid-cols-2">
     <div>
         <x-input-label for="pos_product_category_id" :value="__('Category')" />
-        <select id="pos_product_category_id" name="pos_product_category_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-            <option value="">No category</option>
+        <select id="pos_product_category_id" name="pos_product_category_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+            <option value="">Select category</option>
             @foreach ($categories as $category)
-                <option value="{{ $category->id }}" @selected((string) old('pos_product_category_id', $product->pos_product_category_id) === (string) $category->id)>{{ $category->name }}</option>
+                <option value="{{ $category->id }}" @selected((string) old('pos_product_category_id', $product->pos_product_category_id) === (string) $category->id)>{{ $category->sectionLabel() }} · {{ $category->name }}</option>
             @endforeach
         </select>
         <x-input-error class="mt-2" :messages="$errors->get('pos_product_category_id')" />

@@ -22,6 +22,7 @@ class UpdatePosProductCategoryRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'code' => ['nullable', 'string', 'max:100', Rule::unique('pos_product_categories', 'code')->ignore($category->id)],
             'description' => ['nullable', 'string'],
+            'pos_section' => ['required', Rule::in(array_keys(PosProductCategory::sectionOptions()))],
             'status' => ['required', Rule::in(['active', 'inactive'])],
         ];
     }

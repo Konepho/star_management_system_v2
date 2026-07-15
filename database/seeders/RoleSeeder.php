@@ -16,6 +16,7 @@ class RoleSeeder extends Seeder
             ['name' => 'Section Head', 'slug' => 'section_head', 'description' => 'Section-level academic management access.', 'is_system' => true],
             ['name' => 'Teacher', 'slug' => 'teacher', 'description' => 'Teaching, attendance, and classroom academic access.', 'is_system' => true],
             ['name' => 'Registrar / Cashier', 'slug' => 'registrar_cashier', 'description' => 'Admissions, enrollment, invoicing, and payment collection access.', 'is_system' => true],
+            ['name' => 'POS Manager', 'slug' => 'pos_manager', 'description' => 'Full management access to POS products, wallets, sales, reversals, and reports.', 'is_system' => true],
             ['name' => 'POS Cashier', 'slug' => 'pos_cashier', 'description' => 'Wallet top-up and POS sale access.', 'is_system' => true],
             ['name' => 'Finance Manager', 'slug' => 'finance_manager', 'description' => 'Finance setup, invoicing, payments, and reports access.', 'is_system' => true],
             ['name' => 'HR Manager', 'slug' => 'hr_manager', 'description' => 'Staff and HR management access.', 'is_system' => true],

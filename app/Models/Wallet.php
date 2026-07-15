@@ -12,6 +12,7 @@ class Wallet extends Model
     use HasFactory;
 
     public const STATUS_ACTIVE = 'active';
+
     public const STATUS_INACTIVE = 'inactive';
 
     protected $fillable = [
@@ -46,8 +47,8 @@ class Wallet extends Model
     public function ownerName(): string
     {
         return match ($this->owner_type) {
-            Student::class => (string) ($this->owner?->full_name ?? 'Student'),
-            Staff::class => (string) ($this->owner?->full_name ?? 'Staff'),
+            Student::class => (string) ($this->owner?->displayName() ?? 'Student'),
+            Staff::class => (string) ($this->owner?->displayName() ?? 'Staff'),
             default => 'Wallet Owner',
         };
     }

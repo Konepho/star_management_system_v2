@@ -96,7 +96,7 @@
                                     <div class="flex items-center justify-between gap-3">
                                         <div>
                                             <div class="font-medium text-slate-900">{{ $sale->sale_no }}</div>
-                                            <div class="text-sm text-slate-600">{{ $sale->ownerName() }}</div>
+                                            <div class="text-sm text-slate-600">{{ $sale->ownerName() }} · {{ $sale->sectionLabel() }}</div>
                                         </div>
                                         <div class="text-right">
                                             <div class="font-semibold text-slate-900">{{ number_format((float) $sale->total_amount, 2) }}</div>

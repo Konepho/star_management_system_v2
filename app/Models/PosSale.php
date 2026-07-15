@@ -12,11 +12,17 @@ class PosSale extends Model
 {
     use HasFactory;
 
+    public const SECTION_SNACK_SHOP = 'snack_shop';
+
+    public const SECTION_STATIONERY = 'stationery';
+
     public const STATUS_POSTED = 'posted';
+
     public const STATUS_REVERSED = 'reversed';
 
     protected $fillable = [
         'sale_no',
+        'pos_section',
         'wallet_id',
         'owner_type',
         'owner_id',
@@ -29,6 +35,11 @@ class PosSale extends Model
         'reversed_at',
         'reversal_reason',
     ];
+
+    public function sectionLabel(): string
+    {
+        return $this->pos_section === self::SECTION_STATIONERY ? 'Stationery' : 'Snack Shop';
+    }
 
     protected function casts(): array
     {
@@ -63,8 +74,8 @@ class PosSale extends Model
     public function ownerName(): string
     {
         return $this->owner_type === Staff::class
-            ? (string) ($this->owner?->full_name ?? 'Staff')
-            : (string) ($this->owner?->full_name ?? 'Student');
+            ? (string) ($this->owner?->displayName() ?? 'Staff')
+            : (string) ($this->owner?->displayName() ?? 'Student');
     }
 
     public function ownerIdentifier(): string

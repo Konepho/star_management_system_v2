@@ -40,7 +40,8 @@
         [
             'title' => 'POS / Wallet',
             'items' => [
-                ['label' => 'POS Cashier', 'route' => route('pos-cashier.index'), 'active' => request()->routeIs('pos-cashier.*'), 'permissions' => ['wallets.topup', 'pos_sales.create']],
+                ['label' => 'Snack Shop POS', 'route' => route('pos-cashier.snack-shop'), 'active' => request()->routeIs('pos-cashier.snack-shop'), 'permissions' => ['wallets.topup', 'pos_sales.create']],
+                ['label' => 'Stationery POS', 'route' => route('pos-cashier.stationery'), 'active' => request()->routeIs('pos-cashier.stationery'), 'permissions' => ['wallets.topup', 'pos_sales.create']],
                 ['label' => 'Wallets', 'route' => route('wallets.index'), 'active' => request()->routeIs('wallets.*'), 'permissions' => ['wallets.view']],
                 ['label' => 'Wallet Top-up', 'route' => route('wallet-topups.create'), 'active' => request()->routeIs('wallet-topups.*'), 'permissions' => ['wallets.topup']],
                 ['label' => 'POS Categories', 'route' => route('pos-product-categories.index'), 'active' => request()->routeIs('pos-product-categories.*'), 'permissions' => ['pos_products.manage']],

@@ -15,7 +15,7 @@ class StorePosProductRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'pos_product_category_id' => ['nullable', 'exists:pos_product_categories,id'],
+            'pos_product_category_id' => ['required', 'exists:pos_product_categories,id'],
             'name' => ['required', 'string', 'max:255'],
             'sku' => ['nullable', 'string', 'max:100', 'unique:pos_products,sku'],
             'description' => ['nullable', 'string'],

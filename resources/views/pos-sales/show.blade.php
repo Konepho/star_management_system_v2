@@ -1,3 +1,9 @@
+@php
+    $cashierRoute = $sale->pos_section === \App\Models\PosSale::SECTION_STATIONERY
+        ? 'pos-cashier.stationery'
+        : 'pos-cashier.snack-shop';
+@endphp
+
 <x-app-layout>
     <x-slot name="header">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -5,15 +11,20 @@
                 <h2 class="text-xl font-semibold leading-tight text-slate-900">POS Sale {{ $sale->sale_no }}</h2>
                 <p class="mt-1 text-sm text-slate-700">{{ $sale->ownerName() }} · {{ $sale->ownerIdentifier() }}</p>
             </div>
-            @if (auth()->user()->hasPermission('pos_sales.reverse') && ! $sale->isReversed())
-                <form method="POST" action="{{ route('pos-sales.destroy', $sale) }}" onsubmit="return confirm('Reverse this POS sale?');">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="inline-flex items-center rounded-md bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-500">
-                        Reverse Sale
-                    </button>
-                </form>
-            @endif
+            <div class="flex flex-wrap gap-2">
+                <a href="{{ route($cashierRoute) }}" class="inline-flex items-center rounded-md bg-sky-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2">
+                    Scan Another Customer
+                </a>
+                @if (auth()->user()->hasPermission('pos_sales.reverse') && ! $sale->isReversed())
+                    <form method="POST" action="{{ route('pos-sales.destroy', $sale) }}" onsubmit="return confirm('Reverse this POS sale?');">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="inline-flex items-center rounded-md bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-500">
+                            Reverse Sale
+                        </button>
+                    </form>
+                @endif
+            </div>
         </div>
     </x-slot>
 
@@ -30,6 +41,10 @@
                         <div>
                             <dt class="text-xs uppercase tracking-wide text-slate-500">Total</dt>
                             <dd class="text-lg font-semibold text-slate-900">{{ number_format((float) $sale->total_amount, 2) }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs uppercase tracking-wide text-slate-500">POS Section</dt>
+                            <dd class="text-sm text-slate-900">{{ $sale->sectionLabel() }}</dd>
                         </div>
                         <div>
                             <dt class="text-xs uppercase tracking-wide text-slate-500">Status</dt>

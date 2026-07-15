@@ -15,9 +15,13 @@ class Student extends Model
     use HasFactory;
 
     public const STATUS_ACTIVE = 'active';
+
     public const STATUS_INACTIVE = 'inactive';
+
     public const STATUS_GRADUATED = 'graduated';
+
     public const STATUS_TRANSFERRED = 'transferred';
+
     public const STATUS_ARCHIVED = 'archived';
 
     protected $fillable = [
@@ -142,11 +146,21 @@ class Student extends Model
         return $this->hasOne(Guardian::class)->where('relation', Guardian::RELATION_MOTHER);
     }
 
+    public function displayName(): string
+    {
+        return collect([
+            trim((string) $this->preferred_name),
+            trim((string) ($this->name_en ?: $this->full_name)),
+        ])->filter()
+            ->unique()
+            ->implode(' / ') ?: $this->full_name;
+    }
+
     protected function fullName(): Attribute
     {
         return Attribute::make(
             get: function (): string {
-                $legacyName = trim($this->first_name . ' ' . $this->last_name);
+                $legacyName = trim($this->first_name.' '.$this->last_name);
 
                 if ($legacyName !== '' && $this->last_name !== '') {
                     return $legacyName;

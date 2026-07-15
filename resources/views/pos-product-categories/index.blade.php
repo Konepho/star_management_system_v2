@@ -25,6 +25,7 @@
                                 <tr>
                                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Category</th>
                                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Code</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Cashier Page</th>
                                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Products</th>
                                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Status</th>
                                     <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">Actions</th>
@@ -40,6 +41,7 @@
                                             @endif
                                         </td>
                                         <td class="px-4 py-4 text-sm text-slate-600">{{ $category->code ?: '—' }}</td>
+                                        <td class="px-4 py-4 text-sm text-slate-600">{{ $category->sectionLabel() }}</td>
                                         <td class="px-4 py-4 text-sm text-slate-600">{{ number_format((int) $category->products_count) }}</td>
                                         <td class="px-4 py-4 text-sm text-slate-600">
                                             <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $category->status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700' }}">
@@ -59,7 +61,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="px-4 py-8 text-center text-sm text-slate-500">No POS categories yet.</td>
+                                        <td colspan="6" class="px-4 py-8 text-center text-sm text-slate-500">No POS categories yet.</td>
                                     </tr>
                                 @endforelse
                             </tbody>

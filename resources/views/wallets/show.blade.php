@@ -12,8 +12,11 @@
                     </a>
                 @endif
                 @if (auth()->user()->hasPermission('pos_sales.create'))
-                    <a href="{{ route('pos-sales.create', ['identifier' => $wallet->ownerIdentifier()]) }}" class="inline-flex items-center rounded-md bg-sky-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-600">
-                        New Sale
+                    <a href="{{ route('pos-cashier.snack-shop', ['identifier' => $wallet->ownerIdentifier()]) }}" class="inline-flex items-center rounded-md bg-sky-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-600">
+                        Snack Shop Sale
+                    </a>
+                    <a href="{{ route('pos-cashier.stationery', ['identifier' => $wallet->ownerIdentifier()]) }}" class="inline-flex items-center rounded-md bg-indigo-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-600">
+                        Stationery Sale
                     </a>
                 @endif
             </div>

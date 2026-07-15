@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\PosProductCategory;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -18,6 +19,7 @@ class StorePosProductCategoryRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'code' => ['nullable', 'string', 'max:100', 'unique:pos_product_categories,code'],
             'description' => ['nullable', 'string'],
+            'pos_section' => ['required', Rule::in(array_keys(PosProductCategory::sectionOptions()))],
             'status' => ['required', Rule::in(['active', 'inactive'])],
         ];
     }

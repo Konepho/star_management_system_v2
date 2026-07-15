@@ -5,9 +5,10 @@
                 <h2 class="text-xl font-semibold leading-tight text-slate-900">POS Sales</h2>
                 <p class="mt-1 text-sm text-slate-700">Review prepaid-credit sales and reverse them safely when needed.</p>
             </div>
-            <a href="{{ route('pos-sales.create') }}" class="inline-flex w-full items-center justify-center rounded-md bg-sky-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-600 sm:w-auto">
-                New POS Sale
-            </a>
+            <div class="flex gap-2">
+                <a href="{{ route('pos-cashier.snack-shop') }}" class="inline-flex items-center justify-center rounded-md bg-sky-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-600">Snack Shop Sale</a>
+                <a href="{{ route('pos-cashier.stationery') }}" class="inline-flex items-center justify-center rounded-md bg-indigo-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-600">Stationery Sale</a>
+            </div>
         </div>
     </x-slot>
 
@@ -25,6 +26,7 @@
                                 <tr>
                                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Sale No</th>
                                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Owner</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Section</th>
                                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Total</th>
                                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Status</th>
                                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Created</th>
@@ -39,6 +41,7 @@
                                             <div>{{ $sale->ownerName() }}</div>
                                             <div class="text-xs text-slate-500">{{ $sale->ownerIdentifier() }}</div>
                                         </td>
+                                        <td class="px-4 py-4 text-sm text-slate-600">{{ $sale->sectionLabel() }}</td>
                                         <td class="px-4 py-4 text-sm font-medium text-slate-900">{{ number_format((float) $sale->total_amount, 2) }}</td>
                                         <td class="px-4 py-4 text-sm text-slate-600">{{ ucfirst($sale->status) }}</td>
                                         <td class="px-4 py-4 text-sm text-slate-600">{{ $sale->created_at?->format('Y-m-d H:i') }}</td>
@@ -57,7 +60,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="6" class="px-4 py-8 text-center text-sm text-slate-500">No POS sales yet.</td>
+                                        <td colspan="7" class="px-4 py-8 text-center text-sm text-slate-500">No POS sales yet.</td>
                                     </tr>
                                 @endforelse
                             </tbody>

@@ -73,6 +73,7 @@ class StaffManagementTest extends TestCase
         $response->assertOk();
         $response->assertSee('HR Manager');
         $response->assertSee('Vice Principal');
+        $response->assertSee('POS Manager');
         $response->assertSee('POS Cashier');
         $response->assertDontSee('System Administrator');
         $response->assertDontSee('Finance Officer');

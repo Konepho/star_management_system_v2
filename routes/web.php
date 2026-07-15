@@ -165,6 +165,14 @@ Route::middleware('auth')->group(function () {
     Route::get('pos-cashier', PosCashierController::class)
         ->middleware('permission:wallets.topup,pos_sales.create')
         ->name('pos-cashier.index');
+    Route::get('pos-cashier/snack-shop', PosCashierController::class)
+        ->defaults('section', 'snack_shop')
+        ->middleware('permission:wallets.topup,pos_sales.create')
+        ->name('pos-cashier.snack-shop');
+    Route::get('pos-cashier/stationery', PosCashierController::class)
+        ->defaults('section', 'stationery')
+        ->middleware('permission:wallets.topup,pos_sales.create')
+        ->name('pos-cashier.stationery');
     Route::resource('pos-products', PosProductController::class)
         ->except('show')
         ->middleware('permission:pos_products.manage');

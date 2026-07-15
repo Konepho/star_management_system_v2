@@ -2,10 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AuditLog;
 use App\Models\AcademicYear;
+use App\Models\AuditLog;
 use App\Models\Enrollment;
-use App\Models\ExternalExamPayment;
 use App\Models\ExternalExamRegistration;
 use App\Models\Grade;
 use App\Models\PosProduct;
@@ -19,8 +18,8 @@ use App\Models\User;
 use App\Models\WalletTransaction;
 use App\Support\SectionScope;
 use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class DashboardController extends Controller
@@ -63,6 +62,10 @@ class DashboardController extends Controller
 
         if ($user->hasRole('finance_manager')) {
             return 'Finance dashboard';
+        }
+
+        if ($user->hasRole('pos_manager')) {
+            return 'POS management dashboard';
         }
 
         if ($user->hasRole('pos_cashier')) {
@@ -209,7 +212,8 @@ class DashboardController extends Controller
         $this->pushActionIfAllowed($actions, $user, 'student_invoices.create', 'Generate Invoice', 'Create a new student invoice.', 'student-invoices.create', 'violet');
         $this->pushActionIfAllowed($actions, $user, 'student_payments.collect', 'Collect Payment', 'Post a student payment or receipt.', 'student-payments.index', 'emerald');
         $this->pushActionIfAllowed($actions, $user, 'wallets.topup', 'Top Up Wallet', 'Load prepaid balance for student or staff.', 'wallet-topups.create', 'teal');
-        $this->pushActionIfAllowed($actions, $user, 'pos_sales.create', 'Quick POS Sale', 'Open cashier sale screen.', 'pos-cashier.index', 'rose');
+        $this->pushActionIfAllowed($actions, $user, 'pos_sales.create', 'Snack Shop POS', 'Sell snacks, lunch, and drinks.', 'pos-cashier.snack-shop', 'rose');
+        $this->pushActionIfAllowed($actions, $user, 'pos_sales.create', 'Stationery POS', 'Sell stationery items.', 'pos-cashier.stationery', 'violet');
         $this->pushActionIfAllowed($actions, $user, 'report_cards.view', 'Open Report Cards', 'Review exam summaries and report cards.', 'report-cards.index', 'slate');
         $this->pushActionIfAllowed($actions, $user, 'id_cards.students.print', 'Print Student ID Cards', 'Open the student card printing page.', 'student-id-cards.index', 'amber');
 

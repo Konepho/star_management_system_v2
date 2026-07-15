@@ -12,6 +12,7 @@ use App\Services\WalletLedgerService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class PosSaleController extends Controller
@@ -19,8 +20,7 @@ class PosSaleController extends Controller
     public function __construct(
         protected PosOwnerLookupService $ownerLookupService,
         protected WalletLedgerService $walletLedgerService,
-    ) {
-    }
+    ) {}
 
     public function index(): View
     {
@@ -35,6 +35,8 @@ class PosSaleController extends Controller
 
     public function create(Request $request): View
     {
+        $section = $request->string('pos_section')->toString() ?: PosSale::SECTION_SNACK_SHOP;
+        abort_unless(in_array($section, [PosSale::SECTION_SNACK_SHOP, PosSale::SECTION_STATIONERY], true), 404);
         $identifier = trim((string) $request->string('identifier'));
         $owner = $this->ownerLookupService->findOwnerByIdentifier($identifier);
         $wallet = $owner ? $this->ownerLookupService->walletForOwner($owner)->load('owner') : null;
@@ -43,22 +45,42 @@ class PosSaleController extends Controller
             'identifier' => $identifier,
             'owner' => $owner,
             'wallet' => $wallet,
-            'products' => PosProduct::query()->with('category')->where('status', 'active')->orderBy('name')->get(),
+            'section' => $section,
+            'sectionLabel' => $section === PosSale::SECTION_STATIONERY ? 'Stationery' : 'Snack Shop',
+            'products' => PosProduct::query()
+                ->with('category')
+                ->where('status', 'active')
+                ->whereHas('category', fn ($query) => $query
+                    ->where('status', 'active')
+                    ->where('pos_section', $section))
+                ->orderBy('name')
+                ->get(),
         ]);
     }
 
     public function store(StorePosSaleRequest $request): RedirectResponse
     {
+        $section = $request->validated('pos_section');
         $wallet = Wallet::query()->with('owner')->findOrFail($request->validated('wallet_id'));
         $this->ownerLookupService->ensureWalletIsTransactable($wallet);
 
         $productIds = collect($request->validated('product_ids'));
         $quantities = collect($request->validated('quantities'));
         $products = PosProduct::query()
+            ->with('category')
             ->where('status', 'active')
             ->whereIn('id', $productIds->all())
+            ->whereHas('category', fn ($query) => $query
+                ->where('status', 'active')
+                ->where('pos_section', $section))
             ->get()
             ->keyBy('id');
+
+        if ($products->count() !== $productIds->map(fn ($id) => (int) $id)->unique()->count()) {
+            throw ValidationException::withMessages([
+                'items' => 'One or more selected products are not available in this POS section.',
+            ]);
+        }
 
         $lines = $productIds
             ->map(function (mixed $productId, int $index) use ($products, $quantities): ?array {
@@ -77,7 +99,7 @@ class PosSaleController extends Controller
             ->filter()
             ->values();
 
-        $sale = $this->walletLedgerService->createSale($wallet, new Collection($lines->all()), $request->validated('notes'));
+        $sale = $this->walletLedgerService->createSale($wallet, new Collection($lines->all()), $section, $request->validated('notes'));
 
         app(AuditLogService::class)->log(
             'finance',
@@ -86,12 +108,13 @@ class PosSaleController extends Controller
             $sale,
             [],
             app(AuditLogService::class)->modelState($sale),
-            'Created POS sale ' . $sale->sale_no . '.',
+            'Created POS sale '.$sale->sale_no.'.',
             [
                 'wallet_id' => $wallet->id,
                 'owner_type' => $wallet->ownerTypeLabel(),
                 'owner_identifier' => $wallet->ownerIdentifier(),
                 'item_count' => $sale->items->count(),
+                'pos_section' => $sale->pos_section,
             ],
         );
 
@@ -123,7 +146,7 @@ class PosSaleController extends Controller
                 $posSale->fresh(),
                 $beforeState,
                 $auditLogService->modelState($posSale->fresh()),
-                'Reversed POS sale ' . $posSale->sale_no . '.',
+                'Reversed POS sale '.$posSale->sale_no.'.',
                 [
                     'wallet_id' => $posSale->wallet_id,
                 ],
