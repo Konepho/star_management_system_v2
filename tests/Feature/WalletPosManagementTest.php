@@ -22,6 +22,46 @@ class WalletPosManagementTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_sales_history_is_paginated_with_stable_order_and_role_actions(): void
+    {
+        $user = User::factory()->create();
+        $this->assignRole($user, 'pos_cashier');
+        $student = Student::factory()->create();
+        $wallet = Wallet::query()->create([
+            'owner_type' => Student::class,
+            'owner_id' => $student->id,
+            'current_balance' => 0,
+            'status' => 'active',
+        ]);
+        $sales = collect();
+        for ($i = 1; $i <= 51; $i++) {
+            $sales->push(PosSale::query()->create([
+                'sale_no' => 'PAGED-'.sprintf('%03d', $i),
+                'wallet_id' => $wallet->id,
+                'owner_type' => Student::class,
+                'owner_id' => $student->id,
+                'total_amount' => 100,
+                'balance_before' => 100,
+                'balance_after' => 0,
+                'status' => $i === 51 ? PosSale::STATUS_REVERSED : PosSale::STATUS_POSTED,
+                'created_at' => '2026-10-01 12:00:00',
+            ]));
+        }
+
+        $response = $this->actingAs($user)->get(route('pos-sales.index'));
+        $response->assertOk()->assertSee('PAGED-051')->assertDontSee('PAGED-001');
+        $response->assertViewHas('sales', fn ($page) => $page->total() === 51 && $page->count() === 50);
+        $response->assertDontSee('Reverse</button>', false);
+        $this->get(route('pos-sales.index', ['page' => 2]))
+            ->assertOk()->assertSee('PAGED-001')->assertDontSee('PAGED-051');
+
+        $this->assignRole($user, 'finance_manager');
+        $user->unsetRelation('roles');
+        $response = $this->actingAs($user)->get(route('pos-sales.index'));
+        $response->assertOk()->assertSee('action="'.route('pos-sales.destroy', $sales[49]).'"', false);
+        $response->assertDontSee('action="'.route('pos-sales.destroy', $sales[50]).'"', false);
+    }
+
     public function test_pos_cashier_can_topup_student_wallet(): void
     {
         $user = User::factory()->create();

@@ -29,7 +29,8 @@ class PosSaleController extends Controller
                 ->with(['owner', 'performedBy'])
                 ->orderByDesc('created_at')
                 ->orderByDesc('id')
-                ->get(),
+                ->paginate(50)
+                ->withQueryString(),
         ]);
     }
 

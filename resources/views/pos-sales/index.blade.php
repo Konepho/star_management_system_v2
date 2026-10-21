@@ -1,4 +1,5 @@
 <x-app-layout>
+    @php($canReverseSales = auth()->user()->hasPermission('pos_sales.reverse'))
     <x-slot name="header">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -48,7 +49,7 @@
                                         <td class="px-4 py-4">
                                             <div class="flex items-center justify-end gap-3">
                                                 <a href="{{ route('pos-sales.show', $sale) }}" class="text-sm font-medium text-sky-700 hover:text-sky-600">View</a>
-                                                @if (auth()->user()->hasPermission('pos_sales.reverse'))
+                                                @if ($canReverseSales && ! $sale->isReversed())
                                                     <form method="POST" action="{{ route('pos-sales.destroy', $sale) }}" onsubmit="return confirm('Reverse this POS sale?');">
                                                         @csrf
                                                         @method('DELETE')
@@ -65,6 +66,9 @@
                                 @endforelse
                             </tbody>
                         </table>
+                    </div>
+                    <div class="mt-4">
+                        {{ $sales->links() }}
                     </div>
                 </div>
             </div>
